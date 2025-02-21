@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greeting App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 50px;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            margin: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .change-word-button {
+            background-color: #2196F3;
+        }
+
+        .change-word-button:hover {
+            background-color: #1976D2;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Welcome to Greeting App</h1>
+        <div>
+            <input type="text" id="nameInput" placeholder="Enter your name">
+            <button onclick="getGreeting()">Get Greeting</button>
+            <button class="change-word-button" onclick="window.location.href='/change-greeting'">
+                Change Word
+            </button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function getGreeting() {
+            const name = document.getElementById( 'nameInput' ).value;
+            const resultDiv = document.getElementById( 'result' );
+
+            if ( !name ) {
+                resultDiv.textContent = 'Please enter a name';
+                return;
+            }
+
+            try {
+                const response = await fetch( `/greet/${name}` );
+                const data = await response.json();
+                resultDiv.textContent = data.message;
+            } catch ( error ) {
+                resultDiv.textContent = 'Error getting greeting';
+            }
+        }
+
+        // Allow Enter key to trigger the greeting
+        document.getElementById( 'nameInput' ).addEventListener( 'keypress', function ( e ) {
+            if ( e.key === 'Enter' ) {
+                getGreeting();
+            }
+        } );
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Change Greeting Word</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 50px;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            margin: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 1.2em;
+        }
+
+        .back-button {
+            background-color: #666;
+        }
+
+        .back-button:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Change Greeting Word</h1>
+        <div>
+            <input type="text" id="wordInput" placeholder="Enter new greeting word">
+            <button onclick="updateGreeting()">Update Greeting</button>
+        </div>
+        <div>
+            <button class="back-button" onclick="window.location.href='/'">Back to Home</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function updateGreeting() {
+            const word = document.getElementById( 'wordInput' ).value;
+            const resultDiv = document.getElementById( 'result' );
+
+            if ( !word ) {
+                resultDiv.textContent = 'Please enter a greeting word';
+                return;
+            }
+
+            try {
+                const response = await fetch( '/greeting-word', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify( {
+                        word: word
+                    } )
+                } );
+                const data = await response.json();
+                resultDiv.textContent = data.message;
+
+                if ( response.ok ) {
+                    setTimeout( () => {
+                        window.location.href = '/';
+                    }, 1500 );
+                }
+            } catch ( error ) {
+                resultDiv.textContent = 'Error updating greeting word';
+            }
+        }
+
+        // Allow Enter key to trigger the update
+        document.getElementById( 'wordInput' ).addEventListener( 'keypress', function ( e ) {
+            if ( e.key === 'Enter' ) {
+                updateGreeting();
+            }
+        } );
+    </script>
+</body>
+
+</html>
