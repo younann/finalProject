@@ -58,6 +58,19 @@ docker build -t python-devsecops .
 docker run -p 8000:8000 python-devsecops
 ```
 
+## Terraform script
+```bash
+terraform init
+terraform apply -auto-approve
+```
+Verify the deployment
+
+```bash
+kubectl get pods -n default
+```
+
+
+
 ## Security Features
 
 - Dependency scanning for vulnerabilities
