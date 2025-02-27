@@ -69,7 +69,7 @@ aws configure
 
 ```bash
 AWS Access Key ID: AKIATCKARGM6UYT2J76M
-AWS Secret Access Key: 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
+AWS Secret Access Key: ***************************
 Default region name: us-east-1
 Default output format: json
 ```
