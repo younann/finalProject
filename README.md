@@ -59,6 +59,22 @@ docker run -p 8000:8000 python-devsecops
 ```
 
 ## Terraform script
+
+connecting to AWS
+
+run
+```bash
+aws configure
+```
+
+```bash
+AWS Access Key ID: AKIATCKARGM6UYT2J76M
+AWS Secret Access Key: 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
+Default region name: us-east-1
+Default output format: json
+```
+
+initiate terraform
 ```bash
 terraform init
 terraform apply -auto-approve
@@ -68,6 +84,8 @@ Verify the deployment
 ```bash
 kubectl get pods -n default
 ```
+
+aws configure
 
 
 
