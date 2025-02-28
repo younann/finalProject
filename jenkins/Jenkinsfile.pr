@@ -1,0 +1,92 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'my-python-app'
+        DOCKER_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
+                        sh 'python -m pytest tests/'
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Validation') {
+            steps {
+                dir('infra') {
+                    sh 'terraform init -backend=false'
+                    sh 'terraform validate'
+                    sh 'terraform fmt -check'
+                }
+            }
+        }
+
+        stage('Report Status') {
+            steps {
+                script {
+                    // This is where you would update the PR status in GitHub/GitLab/etc.
+                    // Example for GitHub using the GitHub API plugin:
+                    if (env.CHANGE_ID) {
+                        githubPRComment(
+                            comment: "Build and tests passed successfully! ✅",
+                            statusVerifier: { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+                        )
+                        
+                        githubPRStatusPublisher(
+                            statusMsg: [
+                                content: 'Build and tests successful',
+                                context: 'continuous-integration/jenkins',
+                                status: 'SUCCESS'
+                            ]
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        failure {
+            script {
+                if (env.CHANGE_ID) {
+                    // Update PR with failure status
+                    githubPRComment(
+                        comment: "Build or tests failed! ❌ Please fix the issues before merging.",
+                        statusVerifier: { currentBuild.resultIsWorseThan('SUCCESS') }
+                    )
+                    
+                    githubPRStatusPublisher(
+                        statusMsg: [
+                            content: 'Build or tests failed',
+                            context: 'continuous-integration/jenkins',
+                            status: 'FAILURE'
+                        ]
+                    )
+                }
+            }
+        }
+    }
+}
