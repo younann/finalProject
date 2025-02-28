@@ -67,4 +67,5 @@ variable "max_capacity" {
 variable "github_repo" {
   description = "GitHub repository URL for Kubernetes deployment"
   type        = string
-  default     = "hhttps://github.com/younann/finalProject/blob/main/k8s/deployment.yaml"
+  default     = "https://github.com/younann/finalProject/blob/main/k8s/deployment.yaml"
+}
