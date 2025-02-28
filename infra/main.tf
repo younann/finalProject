@@ -41,6 +41,7 @@ resource "null_resource" "deploy_python_app" {
   provisioner "local-exec" {
     command = <<EOT
       aws eks --region ${var.aws_region} update-kubeconfig --name ${var.cluster_name}
-      kubectl apply -f https://github.com/younann/finalProject/blob/main/k8s/deployment.yaml
+      kubectl apply -f https://raw.githubusercontent.com/younann/finalProject/main/k8s/deployment.yaml
+    EOT
   }
 }
