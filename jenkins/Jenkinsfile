@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Navigate to infra Directory') {
             steps {
-                dir('root/infra') {  // Change working directory to root/infra
+                dir('infra') {  // Change working directory to root/infra
                     script {
                         echo "Current directory: ${pwd()}"
                     }
@@ -19,7 +19,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('root/infra') {  // Run Terraform commands in root/infra
+                dir('infra') {  // Run Terraform commands in root/infra
                     sh 'terraform init'
                 }
             }
@@ -27,7 +27,7 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir('root/infra') {  // Run Terraform commands in root/infra
+                dir('infra') {  // Run Terraform commands in root/infra
                     sh 'terraform plan'
                 }
             }
@@ -43,7 +43,7 @@ pipeline {
 
         stage('Output User Name') {
             steps {
-                dir('root/infra') {  // Run Terraform commands in root/infra
+                dir('infra') {  // Run Terraform commands in root/infra
                     script {
                         def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
                         echo "Created AWS IAM User: ${user_name}"
