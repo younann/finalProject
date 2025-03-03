@@ -13,29 +13,47 @@ pipeline {
             }
         }
 
+        stage('Navigate to infra Directory') {
+            steps {
+                dir('root/infra') {  // Change working directory to root/infra
+                    script {
+                        echo "Current directory: ${pwd()}"
+                    }
+                }
+            }
+        }
+
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                dir('root/infra') {  // Run Terraform commands in root/infra
+                    sh 'terraform init'
+                }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                dir('root/infra') {  // Run Terraform commands in root/infra
+                    sh 'terraform plan'
+                }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve'
+                dir('root/infra') {  // Run Terraform commands in root/infra
+                    sh 'terraform apply -auto-approve'
+                }
             }
         }
 
         stage('Output User Name') {
             steps {
-                script {
-                    def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
-                    echo "Created AWS IAM User: ${user_name}"
+                dir('root/infra') {  // Run Terraform commands in root/infra
+                    script {
+                        def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
+                        echo "Created AWS IAM User: ${user_name}"
+                    }
                 }
             }
         }
