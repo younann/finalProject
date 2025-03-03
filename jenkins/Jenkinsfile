@@ -1,11 +1,52 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')  // AWS credentials stored in Jenkins
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')  // AWS credentials stored in Jenkins
+    }
+
     stages {
-        stage('Say Hello') {
+        stage('Checkout Code') {
             steps {
-                echo 'Hello, World!'
+                git branch: 'main', url: 'https://github.com/your-username/your-repo.git'  // Replace with your repo URL
             }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve'
+            }
+        }
+
+        stage('Output User Name') {
+            steps {
+                script {
+                    def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
+                    echo "Created AWS IAM User: ${user_name}"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Terraform apply succeeded!'
+        }
+        failure {
+            echo 'Terraform apply failed!'
         }
     }
 }
