@@ -1,6 +1,18 @@
 pipeline {
     agent any
 
+    stages {
+        stage('Say Hello') {
+            steps {
+                echo 'Hello, World!'
+            }
+        }
+    }
+}
+
+/*pipeline {
+    agent any
+
     parameters {
         choice(name: 'TERRAFORM_ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action to perform')
         string(name: 'WORKSPACE', defaultValue: 'default', description: 'Terraform workspace to use')
@@ -128,3 +140,4 @@ pipeline {
         }
     }
 }
+*/
