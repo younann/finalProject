@@ -1,3 +1,4 @@
+/*
 output "eks_cluster_id" {
   description = "The ID of the EKS cluster"
   value       = module.eks.cluster_id
@@ -22,3 +23,4 @@ output "vpc_id" {
   description = "The ID of the created VPC"
   value       = module.vpc.vpc_id
 }
+*/
