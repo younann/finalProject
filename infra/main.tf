@@ -1,3 +1,6 @@
+
+
+/*
 provider "aws" {
   region = var.aws_region
 }
@@ -45,3 +48,4 @@ resource "null_resource" "deploy_python_app" {
     EOT
   }
 }
+*/
