@@ -1,86 +1,6 @@
 pipeline {
     agent any
 
-    stages {
-        stage('Navigate to infra Directory') {
-            steps {
-                dir('infra') {  // Change working directory to infra
-                    script {
-                        echo "Current directory: ${pwd()}"
-                    }
-                }
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    credentialsId: 'aws-access-key',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    dir('infra') {  // Run Terraform commands in infra
-                        sh 'terraform init'
-                    }
-                }
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    credentialsId: 'aws-access-key',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    dir('infra') {  // Run Terraform commands in infra
-                        sh 'terraform plan'
-                    }
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    credentialsId: 'aws-access-key',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    dir('infra') {  // Run Terraform commands in infra
-                        sh 'terraform apply -auto-approve'
-                    }
-                }
-            }
-        }
-
-        stage('Output User Name') {
-            steps {
-                dir('infra') {  // Run Terraform commands in infra
-                    script {
-                        def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
-                        echo "Created AWS IAM User: ${user_name}"
-                    }
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Terraform apply succeeded!'
-        }
-        failure {
-            echo 'Terraform apply failed!'
-        }
-    }
-}
-/*pipeline {
-    agent any
-
     parameters {
         choice(name: 'TERRAFORM_ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action to perform')
         string(name: 'WORKSPACE', defaultValue: 'default', description: 'Terraform workspace to use')
@@ -208,4 +128,3 @@ pipeline {
         }
     }
 }
-*/
