@@ -1,15 +1,10 @@
 pipeline {
     agent any
 
-    environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')  // AWS credentials stored in Jenkins
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')  // AWS credentials stored in Jenkins
-    }
-
     stages {
         stage('Navigate to infra Directory') {
             steps {
-                dir('infra') {  // Change working directory to root/infra
+                dir('infra') {  // Change working directory to infra
                     script {
                         echo "Current directory: ${pwd()}"
                     }
@@ -19,31 +14,52 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('infra') {  // Run Terraform commands in root/infra
-                    sh 'terraform init'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    credentialsId: 'aws-access-key',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    dir('infra') {  // Run Terraform commands in infra
+                        sh 'terraform init'
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                dir('infra') {  // Run Terraform commands in root/infra
-                    sh 'terraform plan'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    credentialsId: 'aws-access-key',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    dir('infra') {  // Run Terraform commands in infra
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('root/infra') {  // Run Terraform commands in root/infra
-                    sh 'terraform apply -auto-approve'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    credentialsId: 'aws-access-key',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    dir('infra') {  // Run Terraform commands in infra
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
 
         stage('Output User Name') {
             steps {
-                dir('infra') {  // Run Terraform commands in root/infra
+                dir('infra') {  // Run Terraform commands in infra
                     script {
                         def user_name = sh(script: 'terraform output -raw dummy_user_name', returnStdout: true).trim()
                         echo "Created AWS IAM User: ${user_name}"
@@ -62,7 +78,6 @@ pipeline {
         }
     }
 }
-
 /*pipeline {
     agent any
 
