@@ -7,12 +7,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: 'https://github.com/your-username/your-repo.git'  // Replace with your repo URL
-            }
-        }
-
         stage('Navigate to infra Directory') {
             steps {
                 dir('root/infra') {  // Change working directory to root/infra
