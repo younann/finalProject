@@ -78,7 +78,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    docker.build("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}", '.')
                 }
             }
         }
@@ -86,7 +86,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
+                    docker.image("${env.DOCKER_IMAGE}:${env.DOCKER_TAG}").inside {
                         sh 'python -m pytest tests/'
                     }
                 }
@@ -98,16 +98,16 @@ pipeline {
                 branch 'main'
             }
             steps {
-                script {
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
-                                    credentialsId: 'aws-credentials',
-                                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-                        dir('infra') {
-                            sh 'terraform init'
-                            sh 'terraform plan'
-                            sh 'terraform apply -auto-approve'
-                        }
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    dir('infra') {
+                        sh 'terraform init'
+                        sh 'terraform plan'
+                        sh 'terraform apply -auto-approve'
                     }
                 }
             }
@@ -116,9 +116,7 @@ pipeline {
 
     post {
         always {
-            node {
-                cleanWs()
-            }
+            cleanWs()  // Clean the workspace after the pipeline runs
         }
         success {
             echo 'Terraform operation completed successfully!'
