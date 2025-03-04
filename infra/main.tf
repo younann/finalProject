@@ -17,17 +17,18 @@ module "vpc" {
 # Create an EKS Cluster
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
+  version         = "20.33.1"  # Ensure you're using a compatible version
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
-  
+
   subnet_ids = module.vpc.private_subnets
   vpc_id     = module.vpc.vpc_id
-  
-  node_groups = {
+
+  eks_managed_node_groups = {
     eks_nodes = {
-      desired_capacity = var.desired_capacity
-      max_capacity     = var.max_capacity
-      min_capacity     = var.min_capacity
+      desired_size = var.desired_capacity
+      max_size     = var.max_capacity
+      min_size     = var.min_capacity
 
       instance_types = var.instance_types
     }
