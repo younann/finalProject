@@ -2,15 +2,16 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key').username
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key').password
+        // Use double quotes to wrap the function call
+        AWS_ACCESS_KEY_ID     = "${credentials('aws-access-key').username}"
+        AWS_SECRET_ACCESS_KEY = "${credentials('aws-access-key').password}"
         AWS_DEFAULT_REGION    = 'us-west-2' // Change to your preferred region
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject/tree/main/app.git' // Update with your repo URL
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Update with your repo URL
             }
         }
 
