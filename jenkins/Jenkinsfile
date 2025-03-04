@@ -2,18 +2,21 @@ pipeline {
     agent any
 
     environment {
+        // Use Jenkins credentials for AWS access
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2' // Change to your preferred region
     }
 
     stages {
+        // Stage 1: Checkout code from GitHub
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Update with your repo URL
             }
         }
 
+        // Stage 2: Initialize Terraform
         stage('Terraform Init') {
             steps {
                 dir('infra') { // Terraform files are in the 'infra' folder
@@ -22,32 +25,40 @@ pipeline {
             }
         }
 
+        // Stage 3: Run Terraform Plan
         stage('Terraform Plan') {
             steps {
                 dir('infra') {
-                    sh '''
-                        terraform plan \
-                        -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
-                        -var="terraform_lock_table_name=my-terraform-lock-table" \
-                        -var="docker_image=my-docker-repo/my-python-app:latest"
-                    '''
+                    timeout(time: 10, unit: 'MINUTES') { // Add a timeout to prevent hanging
+                        sh '''
+                            export TF_LOG=DEBUG
+                            terraform plan -input=false \
+                            -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
+                            -var="terraform_lock_table_name=my-terraform-lock-table" \
+                            -var="docker_image=my-docker-repo/my-python-app:latest"
+                        '''
+                    }
                 }
             }
         }
 
+        // Stage 4: Apply Terraform Configuration
         stage('Terraform Apply') {
             steps {
                 dir('infra') {
-                    sh '''
-                        terraform apply -auto-approve \
-                        -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
-                        -var="terraform_lock_table_name=my-terraform-lock-table" \
-                        -var="docker_image=my-docker-repo/my-python-app:latest"
-                    '''
+                    timeout(time: 10, unit: 'MINUTES') { // Add a timeout to prevent hanging
+                        sh '''
+                            terraform apply -auto-approve \
+                            -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
+                            -var="terraform_lock_table_name=my-terraform-lock-table" \
+                            -var="docker_image=my-docker-repo/my-python-app:latest"
+                        '''
+                    }
                 }
             }
         }
 
+        // Stage 5: Configure kubectl for EKS Cluster
         stage('Configure kubectl') {
             steps {
                 script {
@@ -84,6 +95,7 @@ users:
             }
         }
 
+        // Stage 6: Deploy Python Application
         stage('Deploy Python App') {
             steps {
                 dir('k8s') { // Kubernetes manifests are in the 'k8s' folder
@@ -94,6 +106,7 @@ users:
         }
     }
 
+    // Post-build actions
     post {
         success {
             echo 'Pipeline completed successfully!'
