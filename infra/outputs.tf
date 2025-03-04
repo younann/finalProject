@@ -1,27 +1,7 @@
-output "eks_cluster_id" {
-  description = "The ID of the EKS cluster"
-  value       = module.eks.cluster_id
+output "ecs_cluster_name" {
+  value = aws_ecs_cluster.main.name
 }
 
-output "eks_cluster_endpoint" {
-  description = "The endpoint for the Kubernetes API server"
-  value       = module.eks.cluster_endpoint
+output "ecs_service_name" {
+  value = aws_ecs_service.app.name
 }
-
-output "eks_cluster_version" {
-  description = "Kubernetes version of the EKS cluster"
-  value       = module.eks.cluster_version
-}
-
-output "node_group_arns" {
-  description = "ARNs of the EKS worker nodes"
-  value       = flatten([
-    for ng in module.eks.eks_managed_node_groups : ng.node_group_arn
-  ])
-}
-
-output "vpc_id" {
-  description = "The ID of the created VPC"
-  value       = module.vpc.vpc_id
-}
-
