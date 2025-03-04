@@ -15,7 +15,9 @@ output "eks_cluster_version" {
 
 output "node_group_arns" {
   description = "ARNs of the EKS worker nodes"
-  value       = module.eks.node_group_arns
+  value       = flatten([
+    for ng in module.eks.eks_managed_node_groups : ng.node_group_arn
+  ])
 }
 
 output "vpc_id" {
