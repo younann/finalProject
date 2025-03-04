@@ -45,3 +45,8 @@ variable "container_port" {
   type        = number
   default     = 80
 }
+
+variable "terraform_backend_bucket_name" {
+  description = "The name of the S3 bucket for Terraform backend"
+  type        = string
+}
