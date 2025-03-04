@@ -38,7 +38,7 @@ pipeline {
                 }
             }
         
- stage('Configure kubectl') {
+        stage('Configure kubectl') {
             steps {
                 script {
                     // Update kubeconfig to access the EKS cluster
@@ -72,7 +72,6 @@ pipeline {
             }
         }
     }
-}
 }
 
 
