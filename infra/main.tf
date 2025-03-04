@@ -5,7 +5,7 @@ provider "aws" {
 # Create a VPC
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "3.14.2"
+  version = "3.14.2" # Use a stable version
 
   name = "eks-vpc"
   cidr = "10.0.0.0/16"
