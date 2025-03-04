@@ -1,23 +1,20 @@
 variable "aws_region" {
-  description = "The AWS region to deploy resources"
-  type        = string
+  description = "AWS region for resources"
   default     = "us-east-1"
 }
 
 variable "terraform_backend_bucket_name" {
-  description = "The name of the S3 bucket for Terraform backend"
+  description = "S3 bucket name for Terraform state"
   type        = string
-  default     = "your-terraform-backend-bucket"
 }
 
 variable "terraform_lock_table_name" {
-  description = "The name of the DynamoDB table for Terraform state locking"
+  description = "DynamoDB table name for state locking"
   type        = string
-  default     = "terraform-lock"
 }
 
 variable "docker_image" {
-  description = "The Docker image to use for the ECS task"
+  description = "Docker image URL for ECS container"
   type        = string
-  default     = "nginx:latest"  # Replace with your Docker image
 }
+
