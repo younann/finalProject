@@ -1,41 +1,54 @@
-variable "region" {
-  description = "The AWS region to deploy resources"
-  type        = string
-  default     = "us-west-2"
+provider "aws" {
+  region = var.region
 }
 
-variable "cluster_name" {
-  description = "The name of the EKS cluster"
-  type        = string
-  default     = "my-eks-cluster"
+# Create a VPC
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "3.14.2"
+
+  name = "eks-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["${var.region}a", "${var.region}b"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+  }
 }
 
-variable "node_group_name" {
-  description = "The name of the EKS managed node group"
-  type        = string
-  default     = "my-eks-node-group"
-}
+# Create an EKS cluster
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "18.30.2"
 
-variable "instance_type" {
-  description = "The instance type for the worker nodes"
-  type        = string
-  default     = "t3.medium"
-}
+  cluster_name    = var.cluster_name
+  cluster_version = "1.24"
 
-variable "desired_size" {
-  description = "The desired number of worker nodes"
-  type        = number
-  default     = 2
-}
+  vpc_id          = module.vpc.vpc_id
+  subnets         = module.vpc.private_subnets
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
-variable "max_size" {
-  description = "The maximum number of worker nodes"
-  type        = number
-  default     = 3
-}
+  eks_managed_node_groups = {
+    (var.node_group_name) = {
+      desired_capacity = var.desired_size
+      max_capacity     = var.max_size
+      min_capacity     = var.min_size
 
-variable "min_size" {
-  description = "The minimum number of worker nodes"
-  type        = number
-  default     = 1
+      instance_types = [var.instance_type]
+      capacity_type  = "ON_DEMAND"
+    }
+  }
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+  }
 }
