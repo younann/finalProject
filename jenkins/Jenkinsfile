@@ -14,19 +14,6 @@ pipeline {
             }
         }
 
-        stage('Debug') {
-            steps {
-                sh '''
-                    echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
-                    echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
-                    echo "Current directory: $(pwd)"
-                    echo "Files in the workspace:"
-                    ls -la
-                    echo "Files in the infra folder:"
-                    ls -la infra
-                '''
-            }
-        }
 
         stage('Terraform Init') {
             steps {
@@ -66,3 +53,4 @@ pipeline {
             }
         }
     }
+}
