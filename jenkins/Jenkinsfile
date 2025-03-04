@@ -6,6 +6,7 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-1' // Change to your preferred region
     }
+
     stages {
         stage('Checkout Code') {
             steps {
@@ -16,6 +17,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('infra') { // Terraform files are in the 'infra' folder
+                    sh 'rm -rf .terraform' // Clear Terraform cache
                     sh 'terraform init'
                 }
             }
@@ -61,8 +63,8 @@ pipeline {
 
     post {
         always {
-            echo "Workspace path: ${WORKSPACE}"
-            sh "ls -la ${WORKSPACE}" // Debug: List files in the workspace
+            echo "Workspace path: ${env.WORKSPACE}"
+            sh "ls -la ${env.WORKSPACE}" // Debug: List files in the workspace
         }
         success {
             echo 'Pipeline completed successfully!'
@@ -72,3 +74,4 @@ pipeline {
         }
     }
 }
+
