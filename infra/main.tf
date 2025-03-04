@@ -117,10 +117,12 @@ resource "aws_lb_target_group" "app" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+  target_type = "ip" # Set target type to "ip" for awsvpc network mode
 
   health_check {
     path = "/"
   }
+}
 
   tags = {
     Name = "app-target-group"
