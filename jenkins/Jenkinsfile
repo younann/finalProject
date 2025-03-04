@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         // Use the AWS Credentials plugin to inject Access Key and Secret Key
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id').username // Access Key
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id').password // Secret Key
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Access Key
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Secret Key
         AWS_DEFAULT_REGION    = 'us-east-1' // Change to your preferred region
     }
 
