@@ -17,7 +17,7 @@ variable "docker_image" {
 variable "region" {
   description = "The AWS region to deploy resources"
   type        = string
-  default     = "us-east-1"
+  default     = "us-west-2"
 }
 
 variable "vpc_cidr_block" {
