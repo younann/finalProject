@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
-        AWS_DEFAULT_REGION    = 'us-west-1' // Change to your preferred region
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Use separate credentials IDs
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Use separate credentials IDs
+        AWS_DEFAULT_REGION    = 'us-west-2' // Updated to us-west-2
     }
 
     stages {
@@ -29,9 +29,12 @@ pipeline {
                         sh '''
                             export TF_LOG=DEBUG
                             terraform plan -input=false \
-                            -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
-                            -var="terraform_lock_table_name=my-terraform-lock-table" \
-                            -var="docker_image=my-docker-repo/my-python-app:latest"
+                            -var="cluster_name=my-eks-cluster" \
+                            -var="node_group_name=my-eks-node-group" \
+                            -var="instance_type=t3.medium" \
+                            -var="desired_size=2" \
+                            -var="max_size=3" \
+                            -var="min_size=1"
                         '''
                     }
                 }
@@ -44,9 +47,12 @@ pipeline {
                     timeout(time: 10, unit: 'MINUTES') { // Add a timeout
                         sh '''
                             terraform apply -auto-approve \
-                            -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
-                            -var="terraform_lock_table_name=my-terraform-lock-table" \
-                            -var="docker_image=my-docker-repo/my-python-app:latest"
+                            -var="cluster_name=my-eks-cluster" \
+                            -var="node_group_name=my-eks-node-group" \
+                            -var="instance_type=t3.medium" \
+                            -var="desired_size=2" \
+                            -var="max_size=3" \
+                            -var="min_size=1"
                         '''
                     }
                 }
@@ -60,7 +66,17 @@ pipeline {
                     def cluster_name = sh(script: 'terraform -chdir=infra output -raw cluster_name', returnStdout: true).trim()
                     def cluster_endpoint = sh(script: 'terraform -chdir=infra output -raw cluster_endpoint', returnStdout: true).trim()
                     def cluster_ca_cert = sh(script: 'terraform -chdir=infra output -raw cluster_ca_certificate', returnStdout: true).trim()
-                    def cluster_token = sh(script: "aws eks get-token --cluster-name ${cluster_name} --region ${AWS_DEFAULT_REGION} --output json | jq -r .status.token", returnStdout: true).trim()
+
+                    if (cluster_name == "null" || cluster_endpoint == "null" || cluster_ca_cert == "null") {
+                        error "Failed to fetch EKS cluster details from Terraform outputs."
+                    }
+
+                    // Fetch EKS cluster token
+                    def cluster_token = sh(script: "aws eks get-token --cluster-name ${cluster_name} --region ${AWS_DEFAULT_REGION} --output json | jq -r .status.token || echo 'null'", returnStdout: true).trim()
+
+                    if (cluster_token == "null") {
+                        error "Failed to fetch EKS cluster token."
+                    }
 
                     // Generate kubeconfig file
                     writeFile file: 'kubeconfig', text: """
@@ -100,6 +116,9 @@ users:
     }
 
     post {
+        always {
+            sh 'rm -f ${WORKSPACE}/kubeconfig' // Clean up the kubeconfig file
+        }
         success {
             echo 'Pipeline completed successfully!'
         }
