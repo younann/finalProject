@@ -2,15 +2,26 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Use a separate credentials ID
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key') // Use a separate credentials ID
-        AWS_DEFAULT_REGION    = 'us-east-1' // Change to your preferred region
+        // Read the single credential and split it into Access Key and Secret Key
+        AWS_CREDENTIALS = credentials('aws-access-key-id') // Read the single credential
+        AWS_ACCESS_KEY_ID = "${AWS_CREDENTIALS.split(',')[0]}" // Extract Access Key
+        AWS_SECRET_ACCESS_KEY = "${AWS_CREDENTIALS.split(',')[1]}" // Extract Secret Key
+        AWS_DEFAULT_REGION = 'us-east-1' // Change to your preferred region
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Update with your repo URL
+                git branch: 'main', url: 'https://github.com/your-username/your-repo.git' // Replace with your repo URL
+            }
+        }
+
+        stage('Debug') {
+            steps {
+                sh '''
+                    echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
+                    echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
+                '''
             }
         }
 
