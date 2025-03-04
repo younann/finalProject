@@ -27,15 +27,15 @@ pipeline {
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
-                    script {
-                        env.AWS_ACCESS_KEY_ID = "${AWS_ACCESS_KEY_ID}"
-                        env.AWS_SECRET_ACCESS_KEY = "${AWS_SECRET_ACCESS_KEY}"
-                        sh 'export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID'
-                        sh 'export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY'
+                    dir('infra') {
+                        script {
+                            // Set Terraform environment variables for AWS credentials
+                            env.TF_VAR_access_key = env.AWS_ACCESS_KEY_ID
+                            env.TF_VAR_secret_key = env.AWS_SECRET_ACCESS_KEY
 
-                        dir('infra') {
                             sh 'terraform init'
-                            def workspaceExists = sh(script: "terraform workspace list | grep ${params.WORKSPACE}", returnStatus: true) == 0
+
+                            def workspaceExists = sh(script: "terraform workspace list | grep -q ${params.WORKSPACE}", returnStatus: true) == 0
                             if (!workspaceExists) {
                                 sh "terraform workspace new ${params.WORKSPACE}"
                             } else {
@@ -113,9 +113,6 @@ pipeline {
 
     post {
         always {
-            script {
-                echo 'Cleaning up workspace...'
-            }
             cleanWs()
         }
         success {
