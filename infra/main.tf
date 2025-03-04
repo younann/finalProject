@@ -1,89 +1,198 @@
+# main.tf
+
+# Provider Configuration
 provider "aws" {
-  region = "us-west-2" // Change to your preferred region
+  region = "us-west-2" # Change to your preferred region
 }
 
-provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.cluster.token
-}
+# VPC Resource
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16" # Define your VPC CIDR block
+  enable_dns_support = true
+  enable_dns_hostnames = true
 
-data "aws_eks_cluster_auth" "cluster" {
-  name = module.eks.cluster_id
-}
-
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"
-
-  cluster_name    = "python-app-cluster"
-  cluster_version = "1.27"
-
-  vpc_id          = "vpc-12345678" // Replace with your VPC ID
-  subnet_ids      = ["subnet-12345678", "subnet-87654321"] // Replace with your subnet IDs
-
-  eks_managed_node_groups = {
-    default = {
-      desired_capacity = 2
-      max_capacity     = 3
-      min_capacity     = 1
-      instance_types   = ["t3.medium"]
-    }
+  tags = {
+    Name = "main-vpc"
   }
 }
 
-resource "kubernetes_deployment" "python_app" {
-  metadata {
-    name = "python-app"
-    labels = {
-      app = "python-app"
+# Public Subnet Resource
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24" # Define your subnet CIDR block
+  availability_zone = "us-west-2a"  # Change to your preferred AZ
+
+  tags = {
+    Name = "public-subnet"
+  }
+}
+
+# ECS Cluster Resource
+resource "aws_ecs_cluster" "main" {
+  name = "my-ecs-cluster" # Name of the ECS cluster
+
+  tags = {
+    Name = "main-ecs-cluster"
+  }
+}
+
+# ECS Task Definition Resource
+resource "aws_ecs_task_definition" "app" {
+  family                   = "my-app-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "my-app-container"
+      image     = var.docker_image # Use the Docker image variable
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+        }
+      ]
     }
+  ])
+
+  tags = {
+    Name = "app-task-definition"
+  }
+}
+
+# ECS Service Resource
+resource "aws_ecs_service" "app" {
+  name            = "my-ecs-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.public.id]
+    security_groups = [aws_security_group.ecs_service.id]
+    assign_public_ip = true
   }
 
-  spec {
-    replicas = 2
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "my-app-container"
+    container_port   = 80
+  }
 
-    selector {
-      match_labels = {
-        app = "python-app"
-      }
-    }
+  tags = {
+    Name = "app-ecs-service"
+  }
+}
 
-    template {
-      metadata {
-        labels = {
-          app = "python-app"
+# Application Load Balancer (ALB) Resource
+resource "aws_lb" "app" {
+  name               = "my-app-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = [aws_subnet.public.id]
+
+  tags = {
+    Name = "app-load-balancer"
+  }
+}
+
+# ALB Target Group Resource
+resource "aws_lb_target_group" "app" {
+  name     = "my-app-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path = "/"
+  }
+
+  tags = {
+    Name = "app-target-group"
+  }
+}
+
+# Security Group for ECS Service
+resource "aws_security_group" "ecs_service" {
+  name        = "ecs-service-sg"
+  description = "Allow inbound traffic from ALB"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "ecs-service-sg"
+  }
+}
+
+# Security Group for ALB
+resource "aws_security_group" "alb" {
+  name        = "alb-sg"
+  description = "Allow inbound HTTP traffic"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "alb-sg"
+  }
+}
+
+# IAM Role for ECS Task Execution
+resource "aws_iam_role" "ecs_task_execution_role" {
+  name = "ecs-task-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
         }
       }
+    ]
+  })
 
-      spec {
-        container {
-          name  = "python-app"
-          image = "your-docker-repo/python-app:latest" // Replace with your Docker image
-          port {
-            container_port = 5000
-          }
-        }
-      }
-    }
+  tags = {
+    Name = "ecs-task-execution-role"
   }
 }
 
-resource "kubernetes_service" "python_app" {
-  metadata {
-    name = "python-app-service"
-  }
-
-  spec {
-    selector = {
-      app = kubernetes_deployment.python_app.metadata[0].labels.app
-    }
-
-    port {
-      port        = 80
-      target_port = 5000
-    }
-
-    type = "LoadBalancer"
-  }
+# IAM Role Policy Attachment
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
