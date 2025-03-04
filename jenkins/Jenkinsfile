@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Jenkins credential ID for AWS Access Key
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Jenkins credential ID for AWS Secret Key
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-east-1' // Change to your preferred region
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Replace with your repo URL
+                git branch: 'main', url:'https://github.com/younann/finalProject.git' // Replace with your repo URL
             }
         }
 
