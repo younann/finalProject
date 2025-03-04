@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // Use the credentials ID directly
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2' // Change to your preferred region
@@ -26,7 +25,12 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('infra') {
-                    sh 'terraform plan'
+                    sh '''
+                        terraform plan \
+                        -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
+                        -var="terraform_lock_table_name=my-terraform-lock-table" \
+                        -var="docker_image=my-docker-repo/my-python-app:latest"
+                    '''
                 }
             }
         }
@@ -34,7 +38,12 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('infra') {
-                    sh 'terraform apply -auto-approve'
+                    sh '''
+                        terraform apply -auto-approve \
+                        -var="terraform_backend_bucket_name=my-terraform-state-bucket" \
+                        -var="terraform_lock_table_name=my-terraform-lock-table" \
+                        -var="docker_image=my-docker-repo/my-python-app:latest"
+                    '''
                 }
             }
         }
