@@ -1,19 +1,41 @@
-# variables.tf
-variable "terraform_backend_bucket_name" {
-  description = "S3 bucket name for Terraform state"
+variable "region" {
+  description = "The AWS region to deploy resources"
   type        = string
-  default     = "my-terraform-state-bucket" # Add a default value
+  default     = "us-east-1"
 }
 
-variable "terraform_lock_table_name" {
-  description = "DynamoDB table name for state locking"
+variable "vpc_cidr_block" {
+  description = "The CIDR block for the VPC"
   type        = string
-  default     = "my-terraform-lock-table" # Add a default value
+  default     = "10.0.0.0/16"
 }
 
-variable "docker_image" {
-  description = "Docker image URL for ECS container"
+variable "ecs_cluster_name" {
+  description = "The name of the ECS cluster"
   type        = string
-  default     = "my-docker-repo/my-python-app:latest" # Add a default value
+  default     = "example-ecs-cluster"
 }
 
+variable "ecs_service_name" {
+  description = "The name of the ECS service"
+  type        = string
+  default     = "example-ecs-service"
+}
+
+variable "task_family" {
+  description = "The family name for the ECS task definition"
+  type        = string
+  default     = "example-app"
+}
+
+variable "container_image" {
+  description = "The Docker image to use for the ECS task"
+  type        = string
+  default     = "nginx:latest"
+}
+
+variable "container_port" {
+  description = "The port the container listens on"
+  type        = number
+  default     = 80
+}
