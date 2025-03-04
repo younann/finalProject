@@ -10,6 +10,8 @@ pipeline {
         DOCKER_IMAGE = 'my-python-app'
         DOCKER_TAG = 'latest'
         TF_IN_AUTOMATION = 'true'
+        TERRAFORM_BACKEND_BUCKET = 'your-terraform-backend-bucket'  // Replace with actual bucket name
+        AWS_REGION = 'us-east-1'  // Ensure this matches your AWS region
     }
 
     stages {
@@ -19,7 +21,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Backend Setup') {
+        stage('Check & Setup Terraform Backend') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
@@ -27,13 +29,19 @@ pipeline {
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
-                    dir('infra/backend-setup') {
-                        script {
-                            env.TF_VAR_access_key = env.AWS_ACCESS_KEY_ID
-                            env.TF_VAR_secret_key = env.AWS_SECRET_ACCESS_KEY
+                    script {
+                        def bucketExists = sh(
+                            script: "aws s3api head-bucket --bucket ${env.TERRAFORM_BACKEND_BUCKET} 2>/dev/null",
+                            returnStatus: true
+                        ) == 0
 
-                            sh 'terraform init'
-                            sh 'terraform apply -auto-approve'
+                        if (!bucketExists) {
+                            echo "S3 backend bucket does not exist. Creating..."
+                            sh "aws s3api create-bucket --bucket ${env.TERRAFORM_BACKEND_BUCKET} --region ${env.AWS_REGION} --create-bucket-configuration LocationConstraint=${env.AWS_REGION}"
+                            sh "aws s3api put-bucket-versioning --bucket ${env.TERRAFORM_BACKEND_BUCKET} --versioning-configuration Status=Enabled"
+                            sh "aws s3api put-bucket-encryption --bucket ${env.TERRAFORM_BACKEND_BUCKET} --server-side-encryption-configuration '{\"Rules\": [{\"ApplyServerSideEncryptionByDefault\": {\"SSEAlgorithm\": \"AES256\"}}]}'"
+                        } else {
+                            echo "S3 backend bucket already exists."
                         }
                     }
                 }
@@ -50,7 +58,7 @@ pipeline {
                 ]]) {
                     dir('infra') {
                         script {
-                            sh 'terraform init -migrate-state'
+                            sh 'terraform init'
 
                             def workspaceExists = sh(script: "terraform workspace list | grep -q ${params.WORKSPACE}", returnStatus: true) == 0
                             if (!workspaceExists) {
