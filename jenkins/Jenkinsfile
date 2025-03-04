@@ -19,38 +19,22 @@ pipeline {
             }
         }
 
-        stage('Terraform Init') {
+        stage('Terraform Init & Workspace') {
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
-                    dir('infra') {
-                        sh 'terraform init'
-                    }
-                }
-            }
-        }
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    script {
+                        env.AWS_ACCESS_KEY_ID = "${AWS_ACCESS_KEY_ID}"
+                        env.AWS_SECRET_ACCESS_KEY = "${AWS_SECRET_ACCESS_KEY}"
+                        sh 'export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID'
+                        sh 'export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY'
 
-        stage('Terraform Workspace') {
-            steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
-                    dir('infra') {
-                        script {
-                            env.TF_VAR_access_key = env.AWS_ACCESS_KEY_ID
-                            env.TF_VAR_secret_key = env.AWS_SECRET_ACCESS_KEY
-
+                        dir('infra') {
+                            sh 'terraform init'
                             def workspaceExists = sh(script: "terraform workspace list | grep ${params.WORKSPACE}", returnStatus: true) == 0
                             if (!workspaceExists) {
                                 sh "terraform workspace new ${params.WORKSPACE}"
@@ -64,61 +48,28 @@ pipeline {
         }
 
         stage('Terraform Plan') {
-            when {
-                expression { params.TERRAFORM_ACTION == 'plan' || params.TERRAFORM_ACTION == 'apply' }
-            }
+            when { expression { params.TERRAFORM_ACTION == 'plan' || params.TERRAFORM_ACTION == 'apply' } }
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
-                    dir('infra') {
-                        sh 'terraform plan -out=tfplan'
-                    }
+                dir('infra') {
+                    sh 'terraform plan -out=tfplan'
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when {
-                expression { params.TERRAFORM_ACTION == 'apply' }
-            }
+            when { expression { params.TERRAFORM_ACTION == 'apply' } }
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
-                    dir('infra') {
-                        sh 'terraform apply -auto-approve tfplan'
-                    }
+                dir('infra') {
+                    sh 'terraform apply -auto-approve tfplan'
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when {
-                expression { params.TERRAFORM_ACTION == 'destroy' }
-            }
+            when { expression { params.TERRAFORM_ACTION == 'destroy' } }
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
-                    dir('infra') {
-                        sh 'terraform destroy -auto-approve'
-                    }
+                dir('infra') {
+                    sh 'terraform destroy -auto-approve'
                 }
             }
         }
@@ -142,18 +93,14 @@ pipeline {
         }
 
         stage('Deploy to AWS') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-credentials',
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]
-                ]) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
                     dir('infra') {
                         sh 'terraform init'
                         sh 'terraform plan'
@@ -167,12 +114,7 @@ pipeline {
     post {
         always {
             script {
-                try {
-                    def consoleLog = currentBuild.rawBuild.getLog(100).join("\n")
-                    writeFile(file: "console_output_${BUILD_NUMBER}.txt", text: consoleLog)
-                } catch (Exception e) {
-                    echo "Error capturing logs: ${e}"
-                }
+                echo 'Cleaning up workspace...'
             }
             cleanWs()
         }
