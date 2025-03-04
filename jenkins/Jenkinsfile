@@ -17,7 +17,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('infra') { // Change to the infra directory
+                dir('infra') {
                     sh 'terraform init'
                 }
             }
@@ -25,7 +25,7 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir('infra') { // Change to the infra directory
+                dir('infra') {
                     sh 'terraform plan'
                 }
             }
@@ -33,11 +33,12 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir('infra') { // Change to the infra directory
+                dir('infra') {
                     sh 'terraform apply -auto-approve'
                 }
             }
-        
+        }
+
         stage('Configure kubectl') {
             steps {
                 script {
@@ -53,7 +54,7 @@ pipeline {
         stage('Deploy Application') {
             steps {
                 dir('k8s') {
-                    sh 'kubectl apply -f test.yaml'
+                    sh 'kubectl apply -f deployment.yaml'
                 }
             }
         }
@@ -73,7 +74,6 @@ pipeline {
         }
     }
 }
-
 
 /* ###make an empty cluster 
 pipeline {
