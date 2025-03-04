@@ -18,6 +18,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                sh 'ls -R'  // DEBUG: Check if Terraform files are present
             }
         }
 
@@ -58,6 +59,12 @@ pipeline {
                 ]]) {
                     dir('infra') {
                         script {
+                            // Check if Terraform files exist
+                            def tfFilesExist = sh(script: 'ls *.tf 2>/dev/null | wc -l', returnStdout: true).trim().toInteger() > 0
+                            if (!tfFilesExist) {
+                                error "No Terraform configuration files found in infra/. Please check your repository."
+                            }
+
                             sh 'terraform init'
 
                             def workspaceExists = sh(script: "terraform workspace list | grep -q ${params.WORKSPACE}", returnStatus: true) == 0
