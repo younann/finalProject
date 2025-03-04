@@ -1,3 +1,10 @@
+variable "AWS_ACCESS_KEY_ID" {}
+variable "AWS_SECRET_ACCESS_KEY" {}
+variable "private_key_path" {
+  default = "private_key.pem"
+}
+
+
 variable "aws_region" {
   description = "The AWS region to deploy resources"
   type        = string
