@@ -1,20 +1,10 @@
-terraform {
-  backend "s3" {
-    bucket         = "your-terraform-backend-bucket"
-    key            = "terraform.tfstate"
-    region         = "us-west-2"  # Must match your S3 bucket's region
-    encrypt        = true
-    dynamodb_table = "terraform-lock"
-  }
-}
-
 provider "aws" {
   region     = var.aws_region
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
-# 📌 Create S3 Bucket for Terraform State
+# 🏗️ Create S3 Bucket for Terraform Backend
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "your-terraform-backend-bucket"
 }
@@ -36,7 +26,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
   }
 }
 
-# 📌 DynamoDB Table for Terraform State Locking
+# 🏗️ Create DynamoDB Table for State Locking
 resource "aws_dynamodb_table" "terraform_lock" {
   name         = "terraform-lock"
   billing_mode = "PAY_PER_REQUEST"
@@ -45,6 +35,17 @@ resource "aws_dynamodb_table" "terraform_lock" {
   attribute {
     name = "LockID"
     type = "S"
+  }
+}
+
+# 🚀 Terraform Backend (Manually Set After Initial Apply)
+terraform {
+  backend "s3" {
+    bucket         = "your-terraform-backend-bucket"
+    key            = "terraform.tfstate"
+    region         = "us-west-2"
+    encrypt        = true
+    dynamodb_table = "terraform-lock"
   }
 }
 
