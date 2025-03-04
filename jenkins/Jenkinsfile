@@ -2,25 +2,15 @@ pipeline {
     agent any
 
     environment {
-        // Use the AWS Credentials plugin to inject Access Key and Secret Key
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Access Key
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Secret Key
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Jenkins credential ID for AWS Access Key
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Jenkins credential ID for AWS Secret Key
         AWS_DEFAULT_REGION    = 'us-east-1' // Change to your preferred region
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/your-username/your-repo.git' // Replace with your repo URL
-            }
-        }
-
-        stage('Debug') {
-            steps {
-                sh '''
-                    echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
-                    echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
-                '''
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Replace with your repo URL
             }
         }
 
