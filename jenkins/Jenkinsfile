@@ -2,21 +2,21 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id')
-        AWS_DEFAULT_REGION    = 'us-west-2'
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id') // Use separate credentials IDs
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key-id') // Use separate credentials IDs
+        AWS_DEFAULT_REGION    = 'us-west-2' // Updated to us-west-2
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Update with your repo URL
             }
         }
 
         stage('Terraform Init') {
             steps {
-                dir('infra') {
+                dir('infra') { // Terraform files are in the 'infra' folder
                     sh 'terraform init'
                 }
             }
@@ -25,7 +25,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('infra') {
-                    timeout(time: 10, unit: 'MINUTES') {
+                    timeout(time: 10, unit: 'MINUTES') { // Add a timeout
                         sh '''
                             export TF_LOG=DEBUG
                             terraform plan -input=false \
@@ -44,7 +44,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('infra') {
-                    timeout(time: 10, unit: 'MINUTES') {
+                    timeout(time: 10, unit: 'MINUTES') { // Add a timeout
                         sh '''
                             terraform apply -auto-approve \
                             -var="cluster_name=my-eks-cluster" \
@@ -58,64 +58,12 @@ pipeline {
                 }
             }
         }
-
-        stage('Configure kubectl') {
-            steps {
-                script {
-                    def cluster_name = sh(script: 'terraform -chdir=infra output -raw cluster_name', returnStdout: true).trim()
-                    def cluster_endpoint = sh(script: 'terraform -chdir=infra output -raw cluster_endpoint', returnStdout: true).trim()
-                    def cluster_ca_cert = sh(script: 'terraform -chdir=infra output -raw cluster_ca_certificate', returnStdout: true).trim()
-
-                    if (cluster_name == "null" || cluster_endpoint == "null" || cluster_ca_cert == "null") {
-                        error "Failed to fetch EKS cluster details from Terraform outputs."
-                    }
-
-                    def cluster_token = sh(script: "aws eks get-token --cluster-name ${cluster_name} --region ${AWS_DEFAULT_REGION} --output json | jq -r .status.token || echo 'null'", returnStdout: true).trim()
-
-                    if (cluster_token == "null") {
-                        error "Failed to fetch EKS cluster token."
-                    }
-
-                    writeFile file: 'kubeconfig', text: """
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: ${cluster_ca_cert}
-    server: ${cluster_endpoint}
-  name: ${cluster_name}
-contexts:
-- context:
-    cluster: ${cluster_name}
-    user: ${cluster_name}
-  name: ${cluster_name}
-current-context: ${cluster_name}
-kind: Config
-preferences: {}
-users:
-- name: ${cluster_name}
-  user:
-    token: ${cluster_token}
-"""
-                    sh 'export KUBECONFIG=${WORKSPACE}/kubeconfig'
-                }
-            }
-        }
-
-        stage('Deploy Python App') {
-            steps {
-                dir('k8s') {
-                    sh 'kubectl apply -f deployment.yaml'
-                    sh 'kubectl apply -f service.yaml'
-                }
-            }
-        }
     }
 
     post {
         always {
             echo "Workspace path: ${WORKSPACE}"
             sh "ls -la ${WORKSPACE}" // Debug: List files in the workspace
-            sh "rm -f ${WORKSPACE}/kubeconfig" // Use double quotes for variable expansion
         }
         success {
             echo 'Pipeline completed successfully!'
