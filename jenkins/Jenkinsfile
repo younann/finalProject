@@ -14,21 +14,41 @@ pipeline {
             }
         }
 
+        stage('Debug') {
+            steps {
+                sh '''
+                    echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
+                    echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
+                    echo "Current directory: $(pwd)"
+                    echo "Files in the workspace:"
+                    ls -la
+                    echo "Files in the infra folder:"
+                    ls -la infra
+                '''
+            }
+        }
+
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                dir('infra') { // Change to the infra directory
+                    sh 'terraform init'
+                }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                dir('infra') { // Change to the infra directory
+                    sh 'terraform plan'
+                }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve'
+                dir('infra') { // Change to the infra directory
+                    sh 'terraform apply -auto-approve'
+                }
             }
         }
     }
@@ -41,7 +61,8 @@ pipeline {
             echo 'Failed to create EKS cluster.'
         }
         always {
-            sh 'terraform destroy -auto-approve' // Clean up resources after the pipeline runs
+            dir('infra') { // Change to the infra directory
+                sh 'terraform destroy -auto-approve' // Clean up resources after the pipeline runs
+            }
         }
     }
-}
