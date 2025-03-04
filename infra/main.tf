@@ -1,54 +1,84 @@
 provider "aws" {
-  region = var.region
+  region = var.aws_region
 }
 
-# Create a VPC
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "3.14.2" # Use a stable version
+variable "aws_region" {
+  description = "AWS region"
+  default     = "us-east-1"
+}
 
-  name = "eks-vpc"
-  cidr = "10.0.0.0/16"
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  default     = "my-eks-cluster"
+}
 
-  azs             = ["${var.region}a", "${var.region}b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+resource "aws_eks_cluster" "eks_cluster" {
+  name     = var.cluster_name
+  role_arn = aws_iam_role.eks_cluster_role.arn
 
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
+  vpc_config {
+    subnet_ids = aws_subnet.eks_subnets[*].id
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.eks_cluster_AmazonEKSVPCResourceController,
+  ]
+}
+
+resource "aws_iam_role" "eks_cluster_role" {
+  name = "${var.cluster_name}-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "eks.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_AmazonEKSVPCResourceController" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+
+resource "aws_vpc" "eks_vpc" {
+  cidr_block = "10.0.0.0/16"
 
   tags = {
-    Terraform   = "true"
-    Environment = "dev"
+    Name = "${var.cluster_name}-vpc"
   }
 }
 
-# Create an EKS cluster
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "18.30.2"
+resource "aws_subnet" "eks_subnets" {
+  count = 2
 
-  cluster_name    = var.cluster_name
-  cluster_version = "1.24"
-
-  vpc_id          = module.vpc.vpc_id
-  subnets         = module.vpc.private_subnets
-  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-
-  eks_managed_node_groups = {
-    (var.node_group_name) = {
-      desired_capacity = var.desired_size
-      max_capacity     = var.max_size
-      min_capacity     = var.min_size
-
-      instance_types = [var.instance_type]
-      capacity_type  = "ON_DEMAND"
-    }
-  }
+  vpc_id            = aws_vpc.eks_vpc.id
+  cidr_block        = cidrsubnet(aws_vpc.eks_vpc.cidr_block, 8, count.index)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Terraform   = "true"
-    Environment = "dev"
+    Name = "${var.cluster_name}-subnet-${count.index}"
   }
+}
+
+data "aws_availability_zones" "available" {}
+
+output "cluster_name" {
+  value = aws_eks_cluster.eks_cluster.name
+}
+
+output "cluster_endpoint" {
+  value = aws_eks_cluster.eks_cluster.endpoint
 }
