@@ -30,7 +30,12 @@ pipeline {
         stage('Terraform Workspace') {
             steps {
                 dir('infra') {
+
+        
                     script {
+                        // Assign AWS credentials to Terraform variables
+                    env.TF_VAR_access_key = env.AWS_ACCESS_KEY_ID
+                    env.TF_VAR_secret_key = env.AWS_SECRET_ACCESS_KEY
                         def workspaceExists = sh(script: "terraform workspace list | grep ${params.WORKSPACE}", returnStatus: true) == 0
                         if (!workspaceExists) {
                             sh "terraform workspace new ${params.WORKSPACE}"
