@@ -96,11 +96,19 @@ resource "aws_lb" "app" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = [aws_subnet.public.id]
+  subnets            = [aws_subnet.public_az1.id, aws_subnet.public_az2.id] # Subnets in different AZs
+}
 
-  tags = {
-    Name = "app-load-balancer"
-  }
+resource "aws_subnet" "public_az1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-west-2a" # AZ 1
+}
+
+resource "aws_subnet" "public_az2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-west-2b" # AZ 2
 }
 
 # ALB Target Group Resource
