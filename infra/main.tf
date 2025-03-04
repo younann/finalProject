@@ -1,4 +1,31 @@
 provider "aws" {
+  region     = "us-east-1"
+  access_key = var.AWS_ACCESS_KEY_ID
+  secret_key = var.AWS_SECRET_ACCESS_KEY
+}
+
+resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
+
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'Hello, World!' > index.html",
+      "sudo mv index.html /var/www/html/"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("${var.private_key_path}")
+      host        = self.public_ip
+    }
+  }
+}
+
+
+
+provider "aws" {
   region = var.aws_region
 }
 
