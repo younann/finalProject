@@ -4,49 +4,38 @@ variable "region" {
   default     = "us-west-2"
 }
 
-variable "vpc_cidr_block" {
-  description = "The CIDR block for the VPC"
+variable "cluster_name" {
+  description = "The name of the EKS cluster"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "my-eks-cluster"
 }
 
-variable "public_subnet_cidr" {
-  description = "The CIDR block for the public subnet"
+variable "node_group_name" {
+  description = "The name of the EKS managed node group"
   type        = string
-  default     = "10.0.1.0/24"
+  default     = "my-eks-node-group"
 }
 
-variable "ecs_cluster_name" {
-  description = "The name of the ECS cluster"
+variable "instance_type" {
+  description = "The instance type for the worker nodes"
   type        = string
-  default     = "example-ecs-cluster"
+  default     = "t3.medium"
 }
 
-variable "ecs_service_name" {
-  description = "The name of the ECS service"
-  type        = string
-  default     = "example-ecs-service"
-}
-
-variable "task_family" {
-  description = "The family name for the ECS task definition"
-  type        = string
-  default     = "example-app"
-}
-
-variable "docker_image" {
-  description = "The Docker image to use for the ECS task"
-  type        = string
-  default     = "nginx:latest"
-}
-
-variable "container_port" {
-  description = "The port the container listens on"
+variable "desired_size" {
+  description = "The desired number of worker nodes"
   type        = number
-  default     = 80
+  default     = 2
 }
 
-variable "terraform_backend_bucket_name" {
-  description = "The name of the S3 bucket for Terraform backend"
-  type        = string
+variable "max_size" {
+  description = "The maximum number of worker nodes"
+  type        = number
+  default     = 3
+}
+
+variable "min_size" {
+  description = "The minimum number of worker nodes"
+  type        = number
+  default     = 1
 }
