@@ -1,12 +1,13 @@
 terraform {
-  required_version = ">= 1.0.0"
   backend "s3" {
-    bucket         = "my-terraform-state-bucket"
+    bucket         = "your-terraform-backend-bucket"
     key            = "terraform.tfstate"
-    region         = "us-west-2"
+    region         = "us-west-2"  # Must match your S3 bucket's region
     encrypt        = true
+    dynamodb_table = "terraform-lock"
   }
 }
+
 
 provider "aws" {
   region     = var.aws_region
