@@ -15,6 +15,4 @@ output "ecs_service_name" {
   value = aws_ecs_service.app.name
 }
 
-output "load_balancer_dns" {
-  value = aws_lb.app.dns_name
-}
+
