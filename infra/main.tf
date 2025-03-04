@@ -3,7 +3,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 🌍 Terraform Backend (Manually Set After Initial Apply)
+# 🌍 Terraform Backend (Set After First Apply)
 terraform {
   required_providers {
     aws = {
@@ -113,7 +113,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# 🚀 ECS Task Definition
+# 🚀 ECS Task Definition (Updated)
 resource "aws_ecs_task_definition" "app" {
   family                   = "my-app-task"
   requires_compatibilities = ["FARGATE"]
@@ -154,6 +154,15 @@ resource "aws_lb_target_group" "app" {
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
   target_type = "ip"
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    protocol            = "HTTP"
+  }
 }
 
 resource "aws_lb_listener" "http" {
@@ -167,7 +176,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# 🏗 ECS Service
+# 🏗 ECS Service (Linked to ALB)
 resource "aws_ecs_service" "app" {
   name            = "my-app-service"
   cluster         = aws_ecs_cluster.main.id
