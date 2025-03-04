@@ -3,6 +3,11 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+output "public_subnet_id" {
+  description = "The ID of the public subnet"
+  value       = aws_subnet.public.id
+}
+
 output "ecs_cluster_name" {
   description = "The name of the ECS cluster"
   value       = aws_ecs_cluster.main.name
@@ -18,7 +23,7 @@ output "ecs_task_definition_arn" {
   value       = aws_ecs_task_definition.app.arn
 }
 
-output "subnet_id" {
-  description = "The ID of the subnet"
-  value       = aws_subnet.example.id
+output "ecs_service_security_group_id" {
+  description = "The ID of the ECS service security group"
+  value       = aws_security_group.ecs_service.id
 }
