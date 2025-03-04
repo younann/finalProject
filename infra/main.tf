@@ -1,12 +1,11 @@
+# Provider Configuration
 provider "aws" {
-  region     = var.aws_region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
+  region = var.aws_region
 }
 
 # 🏗️ Create S3 Bucket for Terraform Backend
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "your-terraform-backend-bucket"
+  bucket = var.terraform_backend_bucket_name
 }
 
 resource "aws_s3_bucket_versioning" "versioning" {
@@ -28,7 +27,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
 
 # 🏗️ Create DynamoDB Table for State Locking
 resource "aws_dynamodb_table" "terraform_lock" {
-  name         = "terraform-lock"
+  name         = var.terraform_lock_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
@@ -40,12 +39,19 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 # 🚀 Terraform Backend (Manually Set After Initial Apply)
 terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
   backend "s3" {
-    bucket         = "your-terraform-backend-bucket"
+    bucket         = "your-terraform-backend-bucket"  # Replace with your bucket name
     key            = "terraform.tfstate"
     region         = "us-west-2"
     encrypt        = true
-    dynamodb_table = "terraform-lock"
+    dynamodb_table = "terraform-lock"  # Replace with your DynamoDB table name
   }
 }
 
@@ -93,10 +99,10 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
     {
-      name  = "app"
-      image = var.docker_image
-      cpu   = 256
-      memory = 512
+      name      = "app"
+      image     = var.docker_image
+      cpu       = 256
+      memory    = 512
       essential = true
       portMappings = [
         {
@@ -110,14 +116,14 @@ resource "aws_ecs_task_definition" "app" {
 
 resource "aws_ecs_service" "app" {
   name            = "my-app-service"
-  cluster        = aws_ecs_cluster.main.id
+  cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id]
-    security_groups = [aws_security_group.allow_http.id]
+    subnets          = [aws_subnet.public.id]
+    security_groups  = [aws_security_group.allow_http.id]
     assign_public_ip = true
   }
 }
