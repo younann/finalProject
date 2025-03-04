@@ -1,23 +1,23 @@
 variable "aws_region" {
-  description = "AWS region"
+  description = "The AWS region to deploy resources"
   type        = string
   default     = "us-east-1"
 }
 
-variable "aws_access_key" {
-  description = "AWS Access Key"
+variable "terraform_backend_bucket_name" {
+  description = "The name of the S3 bucket for Terraform backend"
   type        = string
-  sensitive   = true
+  default     = "your-terraform-backend-bucket"
 }
 
-variable "aws_secret_key" {
-  description = "AWS Secret Key"
+variable "terraform_lock_table_name" {
+  description = "The name of the DynamoDB table for Terraform state locking"
   type        = string
-  sensitive   = true
+  default     = "terraform-lock"
 }
 
 variable "docker_image" {
-  description = "Docker image for ECS"
+  description = "The Docker image to use for the ECS task"
   type        = string
-  default     = "my-python-app:latest"
+  default     = "nginx:latest"  # Replace with your Docker image
 }
