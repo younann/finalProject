@@ -116,6 +116,12 @@ pipeline {
 
     post {
         always {
+            script {
+                // Capture the console output
+                def consoleLog = currentBuild.rawBuild.logFile.text
+                // Write the console output to a file in the workspace
+                writeFile(file: "console_output_${BUILD_NUMBER}.txt", text: consoleLog)
+            }
             cleanWs()  // Clean the workspace after the pipeline runs
         }
         success {
