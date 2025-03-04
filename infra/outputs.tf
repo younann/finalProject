@@ -1,29 +1,34 @@
+output "cluster_name" {
+  description = "The name of the EKS cluster"
+  value       = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "The endpoint for the EKS cluster"
+  value       = module.eks.cluster_endpoint
+}
+
+output "cluster_security_group_id" {
+  description = "The security group ID of the EKS cluster"
+  value       = module.eks.cluster_security_group_id
+}
+
+output "node_group_name" {
+  description = "The name of the EKS managed node group"
+  value       = var.node_group_name
+}
+
 output "vpc_id" {
   description = "The ID of the VPC"
-  value       = aws_vpc.main.id
+  value       = module.vpc.vpc_id
 }
 
-output "public_subnet_id" {
-  description = "The ID of the public subnet"
-  value       = aws_subnet.public.id
+output "private_subnets" {
+  description = "The IDs of the private subnets"
+  value       = module.vpc.private_subnets
 }
 
-output "ecs_cluster_name" {
-  description = "The name of the ECS cluster"
-  value       = aws_ecs_cluster.main.name
-}
-
-output "ecs_service_name" {
-  description = "The name of the ECS service"
-  value       = aws_ecs_service.app.name
-}
-
-output "ecs_task_definition_arn" {
-  description = "The ARN of the ECS task definition"
-  value       = aws_ecs_task_definition.app.arn
-}
-
-output "ecs_service_security_group_id" {
-  description = "The ID of the ECS service security group"
-  value       = aws_security_group.ecs_service.id
+output "public_subnets" {
+  description = "The IDs of the public subnets"
+  value       = module.vpc.public_subnets
 }
