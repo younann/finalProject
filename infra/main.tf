@@ -135,6 +135,14 @@ resource "aws_security_group" "ecs_service" {
   }
 }
 
+resource "aws_eks_cluster" "example" {
+  name     = "example-cluster"
+  role_arn = aws_iam_role.example.arn
+  vpc_config {
+    subnet_ids = [aws_subnet.example1.id, aws_subnet.example2.id]
+  }
+}
+
 # IAM Role for ECS Task Execution
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "ecs-task-execution-role"
