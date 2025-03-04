@@ -101,14 +101,14 @@ resource "aws_lb" "app" {
 
 resource "aws_subnet" "public_az1" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-west-2a" # AZ 1
+  cidr_block        = "10.0.3.0/24" # Use a different CIDR block
+  availability_zone = "us-west-2a"
 }
 
 resource "aws_subnet" "public_az2" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "us-west-2b" # AZ 2
+  cidr_block        = "10.0.4.0/24" # Use a different CIDR block
+  availability_zone = "us-west-2b"
 }
 
 # ALB Target Group Resource
