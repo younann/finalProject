@@ -1,15 +1,12 @@
-# outputs.tf
 output "vpc_id" {
-  value = aws_vpc.main.id
+  value = module.ecs.vpc_id
 }
 
-
 output "ecs_cluster_name" {
-  value = aws_ecs_cluster.main.name
+  value = module.ecs.ecs_cluster_name
 }
 
 output "ecs_service_name" {
-  value = aws_ecs_service.app.name
+  value = module.ecs.ecs_service_name
 }
-
 
