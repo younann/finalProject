@@ -16,49 +16,22 @@ pipeline {
             }
         }
 
- stage('Build & Push Docker Image') {
-            steps {
-                script {
-                    // Get the AWS account ID
-                    def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                    def ecrUrl = "${accountId}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
-
-                    try {
-                        // Log in to AWS ECR
-                        echo "Logging into AWS ECR..."
-                        sh """
-                            aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
-                            docker login --username AWS --password-stdin ${ecrUrl}
-                        """
-
-                        // Build the Docker image using BuildKit
-                        echo "Building Docker image..."
-                        sh """
-                            DOCKER_BUILDKIT=1 docker build -t ${ECR_REPO_NAME} .
-                        """
-
-                        // Tag the Docker image
-                        echo "Tagging Docker image..."
-                        sh """
-                            docker tag ${ECR_REPO_NAME} ${ecrUrl}/${ECR_REPO_NAME}:${IMAGE_TAG}
-                        """
-
-                        // Push the Docker image to ECR
-                        echo "Pushing Docker image to ECR..."
-                        sh """
-                            docker push ${ecrUrl}/${ECR_REPO_NAME}:${IMAGE_TAG}
-                        """
-
-                        echo "Docker image successfully built and pushed to ECR!"
-                    } catch (Exception e) {
-                        echo "Error building or pushing Docker image: ${e}"
-                        currentBuild.result = 'FAILURE'
-                        throw e
-                    }
-                }
-            }
+        stage('Install kubectl') {
+    steps {
+        script {
+            sh '''
+                if ! command -v kubectl &> /dev/null; then
+                    echo "Installing kubectl..."
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    chmod +x kubectl
+                    sudo mv kubectl /usr/local/bin/
+                else
+                    echo "kubectl is already installed."
+                fi
+            '''
         }
-    
+    }
+}   
 
         stage('Terraform Init') {
             steps {
@@ -75,6 +48,8 @@ pipeline {
                 }
             }
         }
+
+
 
         stage('Configure kubectl') {
             steps {
@@ -104,7 +79,41 @@ pipeline {
                 }
             }
         }
+
+        stage('Terraform Destroy Option') {
+            steps {
+                dir('infra') {
+                    sh 'terraform destroy'
+                }
+            }
+        }
     }
+
+    stage('Verify Deployment') {
+        steps {
+            script {
+            sh '''
+                echo "Waiting for deployment to be ready..."
+                kubectl wait --for=condition=available --timeout=300s deployment/my-app
+                echo "Deployment is ready!"
+            '''
+        }
+    }
+}
+
+
+stage('Cleanup') {
+    steps {
+        script {
+            if (currentBuild.result == 'FAILURE') {
+                echo "Pipeline failed. Cleaning up resources..."
+                dir('infra') {
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
+    }
+}
 
     post {
         success {
@@ -115,7 +124,6 @@ pipeline {
         }
     }
 }
-
 
 /* ###make an empty cluster 
 pipeline {
