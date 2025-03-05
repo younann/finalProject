@@ -2,30 +2,9 @@ provider "aws" {
   region = var.aws_region
 }
 
-variable "aws_region" {
-  description = "AWS region"
-  default     = "us-west-2"
-}
 
-variable "cluster_name" {
-  description = "Name of the EKS cluster"
-  default     = "my-eks-cluster"
-}
-
-variable "ecr_repo_name" {
-  description = "ECR repository name"
-  default     = "python-app-repo"
-}
-
-variable "s3_bucket_name" {
-  description = "S3 bucket for Terraform state or application storage"
-  default     = "my-eks-app-bucket"
-}
-
-variable "dynamodb_table_name" {
-  description = "DynamoDB table for Terraform state locking or app storage"
-  default     = "my-eks-app-table"
-}
+### FETCH AVAILABLE AZs ###
+data "aws_availability_zones" "available" {}
 
 ### S3 BUCKET ###
 resource "aws_s3_bucket" "app_bucket" {
@@ -37,6 +16,14 @@ resource "aws_s3_bucket_versioning" "bucket_versioning" {
   versioning_configuration {
     status = "Enabled"
   }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_bucket_block" {
+  bucket                  = aws_s3_bucket.app_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 ### DYNAMODB TABLE ###
@@ -75,7 +62,23 @@ resource "aws_subnet" "eks_subnets" {
   }
 }
 
-data "aws_availability_zones" "available" {}
+resource "aws_security_group" "alb_sg" {
+  vpc_id = aws_vpc.eks_vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
 resource "aws_iam_role" "eks_cluster_role" {
   name = "${var.cluster_name}-role"
@@ -121,6 +124,21 @@ resource "aws_iam_role" "eks_node_group_role" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.eks_node_group_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.eks_node_group_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_container_registry_read_only" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_node_group_role.name
+}
+
 resource "aws_eks_node_group" "eks_nodes" {
   cluster_name    = aws_eks_cluster.eks_cluster.name
   node_group_name = "${var.cluster_name}-node-group"
@@ -136,18 +154,18 @@ resource "aws_eks_node_group" "eks_nodes" {
   instance_types = ["t3.medium"]
 }
 
-### ECR (Elastic Container Registry) ###
+### ECR ###
 resource "aws_ecr_repository" "python_app_repo" {
   name = var.ecr_repo_name
 }
 
-### APPLICATION LOAD BALANCER (ALB) ###
+### ALB ###
 resource "aws_lb" "app_alb" {
   name               = "${var.cluster_name}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets           = aws_subnet.eks_subnets[*].id
+  subnets            = aws_subnet.eks_subnets[*].id
 }
 
 resource "aws_lb_target_group" "app_tg" {
@@ -156,6 +174,15 @@ resource "aws_lb_target_group" "app_tg" {
   protocol = "HTTP"
   vpc_id   = aws_vpc.eks_vpc.id
   target_type = "ip"
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    matcher             = "200"
+  }
 }
 
 resource "aws_lb_listener" "http_listener" {
@@ -169,45 +196,5 @@ resource "aws_lb_listener" "http_listener" {
   }
 }
 
-resource "aws_security_group" "alb_sg" {
-  vpc_id = aws_vpc.eks_vpc.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 ### OUTPUTS ###
-output "cluster_name" {
-  value = aws_eks_cluster.eks_cluster.name
-}
 
-output "cluster_endpoint" {
-  value = aws_eks_cluster.eks_cluster.endpoint
-}
-
-output "ecr_repository_url" {
-  value = aws_ecr_repository.python_app_repo.repository_url
-}
-
-output "s3_bucket_name" {
-  value = aws_s3_bucket.app_bucket.id
-}
-
-output "dynamodb_table_name" {
-  value = aws_dynamodb_table.app_table.name
-}
-
-output "load_balancer_dns" {
-  value = aws_lb.app_alb.dns_name
-}
