@@ -32,24 +32,6 @@ pipeline {
 
 stage('Check and Install kubectl') {
     steps {
-        script {
-            // Check if kubectl is installed
-            def kubectlInstalled = sh(script: 'command -v kubectl', returnStatus: true) == 0
-
-            if (!kubectlInstalled) {
-                echo "kubectl is not installed. Installing kubectl..."
-                sh '''
-                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    sudo mv kubectl /usr/local/bin/
-                '''
-                echo "kubectl installed successfully."
-            } else {
-                echo "kubectl is already installed."
-            }
-
-            // Verify kubectl installation
-            sh 'kubectl version --client'
         }
     }
 
