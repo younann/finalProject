@@ -65,11 +65,11 @@ pipeline {
             steps {
                 script {
                     sh """
-                        echo "Updating deployment.yaml with the new image..."
-                        sed -i 's|IMAGE_PLACEHOLDER|$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG|g' k8s/deployment.yaml
+                        echo "Updating test.yaml with the new image..."
+                        sed -i 's|IMAGE_PLACEHOLDER|$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG|g' k8s/test.yaml
                         
                         echo "Deploying application to EKS..."
-                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/test.yaml
                         kubectl apply -f k8s/service.yaml
                     """
                 }
