@@ -30,13 +30,28 @@ pipeline {
             }
         }
 
-stage('Check and Install kubectl') {
-    steps {
-        sh '''
-              echo "Nothing for now"            
-            '''
-        }
+	stage('Build') { 
+            steps { 
+               withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
+                 script{
+                 app =  docker.build("devsecops")
+                 }
+               }
+            }
     }
+
+	stage('Push') {
+            steps {
+                script{
+                    docker.withRegistry('https://145988340565.dkr.ecr.us-west-2.amazonaws.com', 'ecr:us-west-2:aws-credentials') {
+                    app.push("latest")
+                    }
+                }
+            }
+    	}
+	   
+	
+        
 
         stage('Terraform Init') {
             steps {
@@ -54,36 +69,14 @@ stage('Check and Install kubectl') {
             }
         }
 
-        stage('Configure kubectl') {
-            steps {
-                script {
-                    sh '''
-                        echo "Waiting for EKS cluster to be ready..."
-                        sleep 60  # Ensuring EKS is ready
-                        aws eks update-kubeconfig --name my-eks-cluster --region us-west-2
-                        kubectl get nodes
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                    def ecrUrl = "${accountId}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
-
-                    sh '''
-                        echo "Updating deployment.yaml with new image..."
-                        sed -i 's|IMAGE_PLACEHOLDER|''' + ecrUrl + '/' + ECR_REPO_NAME + ':' + IMAGE_TAG + '''|g' k8s/deployment.yaml
-                        
-                        echo "Deploying application to EKS..."
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-                    '''
-                }
-            }
-        }
+   stage('Kubernetes Deployment of python Application') {
+	   steps {
+	      withKubeConfig([credentialsId: 'kubelogin']) {
+		  sh('kubectl delete all --all -n devsecops')
+		  sh ('kubectl apply -f deployment.yaml --namespace=devsecops')
+		}
+	      }
+   	}
 
         stage('Verify Deployment') {
             steps {
