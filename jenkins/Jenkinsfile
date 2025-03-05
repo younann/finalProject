@@ -49,10 +49,9 @@ stage('Check and Install kubectl') {
             }
 
             // Verify kubectl installation
-            sh 'kubectl version --client --short'
+            sh 'kubectl version --client'
         }
     }
-}
 
         stage('Terraform Init') {
             steps {
