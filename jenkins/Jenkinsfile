@@ -1,9 +1,13 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(name: 'DESTROY_ENV', defaultValue: false, description: 'Destroy environment after deployment?')
+    }
+
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')  // Ensure correct credential IDs
+        AWS_SECRET_ACCESS_KEY = credentials('aaws-access-key-id')
         AWS_DEFAULT_REGION    = 'us-west-2'
         ECR_REPO_NAME         = 'python-app-repo'
         IMAGE_TAG             = 'latest'
@@ -16,22 +20,32 @@ pipeline {
             }
         }
 
-        stage('Install kubectl') {
-    steps {
-        script {
-            sh '''
-                if ! command -v kubectl &> /dev/null; then
-                    echo "Installing kubectl..."
-                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    sudo mv kubectl /usr/local/bin/
-                else
-                    echo "kubectl is already installed."
-                fi
-            '''
+        stage('Configure AWS CLI') {
+            steps {
+                sh '''
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                    aws configure set region $AWS_DEFAULT_REGION
+                '''
+            }
         }
-    }
-}   
+
+        stage('Install kubectl') {
+            steps {
+                script {
+                    sh '''
+                        if ! command -v kubectl &> /dev/null; then
+                            echo "Installing kubectl..."
+                            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                            chmod +x kubectl
+                            sudo mv kubectl /usr/local/bin/
+                        else
+                            echo "kubectl is already installed."
+                        fi
+                    '''
+                }
+            }
+        }
 
         stage('Terraform Init') {
             steps {
@@ -49,12 +63,12 @@ pipeline {
             }
         }
 
-
-
         stage('Configure kubectl') {
             steps {
                 script {
                     sh '''
+                        echo "Waiting for EKS cluster to be ready..."
+                        sleep 60  # Ensuring EKS is ready
                         aws eks update-kubeconfig --name my-eks-cluster --region us-west-2
                         kubectl get nodes
                     '''
@@ -80,40 +94,44 @@ pipeline {
             }
         }
 
-        stage('Terraform Destroy Option') {
+        stage('Verify Deployment') {
             steps {
-                dir('infra') {
-                    sh 'terraform destroy'
+                script {
+                    sh '''
+                        echo "Waiting for deployment to be ready..."
+                        kubectl wait --for=condition=available --timeout=300s deployment/my-app
+                        echo "Deployment is ready!"
+                    '''
                 }
             }
         }
-    }
 
-    stage('Verify Deployment') {
-        steps {
-            script {
-            sh '''
-                echo "Waiting for deployment to be ready..."
-                kubectl wait --for=condition=available --timeout=300s deployment/my-app
-                echo "Deployment is ready!"
-            '''
-        }
-    }
-}
-
-
-stage('Cleanup') {
-    steps {
-        script {
-            if (currentBuild.result == 'FAILURE') {
-                echo "Pipeline failed. Cleaning up resources..."
+        stage('Terraform Destroy Option') {
+            when {
+                beforeAgent true
+                expression { return params.DESTROY_ENV }  // Runs only if DESTROY_ENV is set to true
+            }
+            steps {
                 dir('infra') {
                     sh 'terraform destroy -auto-approve'
                 }
             }
         }
+
+        stage('Cleanup') {
+            when {
+                expression { return currentBuild.result == 'FAILURE' }
+            }
+            steps {
+                script {
+                    echo "Pipeline failed. Cleaning up resources..."
+                    dir('infra') {
+                        sh 'terraform destroy -auto-approve'
+                    }
+                }
+            }
+        }
     }
-}
 
     post {
         success {
@@ -124,6 +142,9 @@ stage('Cleanup') {
         }
     }
 }
+
+
+
 
 /* ###make an empty cluster 
 pipeline {
