@@ -4,15 +4,15 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
-        AWS_DEFAULT_REGION    = 'us-west-2' // Change to your preferred region
-        ECR_REPO_NAME         = 'python-app-repo' // Ensure this matches your Terraform variable
+        AWS_DEFAULT_REGION    = 'us-west-2'
+        ECR_REPO_NAME         = 'python-app-repo'
         IMAGE_TAG             = 'latest'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Replace with your repo URL
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
             }
         }
 
@@ -38,7 +38,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Terraform Init') {
             steps {
@@ -70,14 +69,17 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh """
-                        echo "Updating test.yaml with the new image..."
-                        sed -i 's|IMAGE_PLACEHOLDER|$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG|g' k8s/test.yaml
+                    def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                    def ecrUrl = "${accountId}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+
+                    sh '''
+                        echo "Updating deployment.yaml with new image..."
+                        sed -i 's|IMAGE_PLACEHOLDER|''' + ecrUrl + '/' + ECR_REPO_NAME + ':' + IMAGE_TAG + '''|g' k8s/deployment.yaml
                         
                         echo "Deploying application to EKS..."
-                        kubectl apply -f k8s/test.yaml
+                        kubectl apply -f k8s/deployment.yaml
                         kubectl apply -f k8s/service.yaml
-                    """
+                    '''
                 }
             }
         }
@@ -92,6 +94,7 @@ pipeline {
         }
     }
 }
+
 
 /* ###make an empty cluster 
 pipeline {
