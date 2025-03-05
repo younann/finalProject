@@ -10,23 +10,34 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url:'https://github.com/younann/finalProject.git' // Replace with your repo URL
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git' // Replace with your repo URL
             }
         }
 
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                        echo "Logging in to AWS ECR..."
+                        aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+                        
+                        echo "Building Docker image..."
+                        docker build -t $ECR_REPO_NAME:$IMAGE_TAG .
+                        
+                        echo "Tagging image..."
+                        docker tag $ECR_REPO_NAME:$IMAGE_TAG $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+                        
+                        echo "Pushing image to ECR..."
+                        docker push $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+                    """
+                }
+            }
+        }
 
         stage('Terraform Init') {
             steps {
                 dir('infra') {
                     sh 'terraform init'
-                }
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                dir('infra') {
-                    sh 'terraform plan'
                 }
             }
         }
@@ -42,7 +53,6 @@ pipeline {
         stage('Configure kubectl') {
             steps {
                 script {
-                    // Update kubeconfig to access the EKS cluster
                     sh '''
                         aws eks update-kubeconfig --name my-eks-cluster --region us-west-2
                         kubectl get nodes
@@ -51,10 +61,17 @@ pipeline {
             }
         }
 
-        stage('Deploy Application') {
+        stage('Deploy to Kubernetes') {
             steps {
-                dir('k8s') {
-                    sh 'kubectl apply -f deployment.yaml'
+                script {
+                    sh """
+                        echo "Updating deployment.yaml with the new image..."
+                        sed -i 's|IMAGE_PLACEHOLDER|$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG|g' k8s/deployment.yaml
+                        
+                        echo "Deploying application to EKS..."
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+                    """
                 }
             }
         }
@@ -66,11 +83,6 @@ pipeline {
         }
         failure {
             echo 'Failed to deploy EKS cluster or application.'
-        }
-        always {
-            dir('infra') {
-                sh 'terraform destroy -auto-approve' // Clean up resources after the pipeline runs
-            }
         }
     }
 }
