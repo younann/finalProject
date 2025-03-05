@@ -44,7 +44,7 @@ pipeline {
                 script {
                     // Update kubeconfig to access the EKS cluster
                     sh '''
-                        aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+                        aws eks update-kubeconfig --name my-eks-cluster --region us-west-2
                         kubectl get nodes
                     '''
                 }
