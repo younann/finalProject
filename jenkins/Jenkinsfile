@@ -32,6 +32,9 @@ pipeline {
 
 stage('Check and Install kubectl') {
     steps {
+        sh '''
+              echo "Nothing for now"            
+            '''
         }
     }
 
