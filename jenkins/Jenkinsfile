@@ -5,6 +5,8 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2' // Change to your preferred region
+        ECR_REPO_NAME         = 'python-app-repo' // Ensure this matches your Terraform variable
+        IMAGE_TAG             = 'latest'
     }
 
     stages {
