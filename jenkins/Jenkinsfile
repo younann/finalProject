@@ -3,6 +3,8 @@ pipeline {
 
     parameters {
         booleanParam(name: 'DESTROY_ENV', defaultValue: false, description: 'Destroy environment after deployment?')
+        booleanParam(name: 'SKIP_TERRAFORM', defaultValue: false, description: 'Skip Terraform deployment?')
+
     }
 
     environment {
