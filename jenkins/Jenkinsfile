@@ -55,7 +55,10 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Apply') {
+         stage('Terraform Init & Apply') {
+            when {
+                expression { return !params.SKIP_TERRAFORM }
+            }
             steps {
                 dir('infra') {
                     sh 'terraform init'
@@ -87,17 +90,16 @@ pipeline {
             }
         }
 
-        stage('Terraform Destroy Option') {
-            when {
-                beforeAgent true
-                expression { return params.DESTROY_ENV }
-            }
-            steps {
-                dir('infra/terraform') {
-                    sh 'terraform destroy -auto-approve'
-                }
+    stage('Terraform Destroy Option') {
+        when {
+            expression { return params.DESTROY_ENV && !params.SKIP_TERRAFORM }
+        }
+        steps {
+            dir('infra') {
+                sh 'terraform destroy -auto-approve'
             }
         }
+    }
 
         stage('Cleanup on Failure') {
             when {
