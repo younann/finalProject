@@ -89,12 +89,16 @@ pipeline {
         stage('Post-Deployment Test') { //check if all was installed
             steps {
                 script {
-                    sh '''
-                        echo "Waiting for deployment to be ready..."
-                        kubectl wait --for=condition=available --timeout=300s deployment/my-app -n devsecops
-                        echo "Deployment is ready!"
-                    '''
-                }
+    def serviceUrl = sh(script: "kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'", returnStdout: true).trim()
+    echo "Service available at http://$serviceUrl"
+    
+    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://$serviceUrl", returnStdout: true).trim()
+    if (response != "200") {
+        error("Post-deployment test failed! Service is unreachable.")
+    } else {
+        echo "Service is up and running!"
+    }
+
             }
         }
 
