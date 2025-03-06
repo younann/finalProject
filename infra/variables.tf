@@ -8,10 +8,6 @@ variable "cluster_name" {
   default     = "devsecops-eks-cluster"
 }
 
-variable "ecr_repo_name" {
-  description = "ECR repository name"
-  default     = "python-app-repo"
-}
 
 variable "s3_bucket_name" {
   description = "S3 bucket for Terraform state or application storage"
