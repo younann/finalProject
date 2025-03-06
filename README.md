@@ -88,7 +88,7 @@ kubectl get pods -n default
 aws configure
 
 
-## Jenkins(Ci/CD)
+## Jenkins(CI/CD)
 
 Create an AWS instance to run Jenkins-server
 
@@ -109,7 +109,7 @@ sudo systemctl enable jenkins
 
 Create a jenkinsfile to run deployment
 
-stages:
+## Stages:
 
 Connect to AWS ->Build docker image -> Run Unit Tests-> Push it to ECR -> Run Terrform to create resource (Optional) -> Deploy to Kubernetes -> Post-Deployment Test -> Destroy all Resources (Optional)
 
