@@ -77,6 +77,7 @@ Default output format: json
 initiate terraform
 ```bash
 terraform init
+terraform plan
 terraform apply -auto-approve
 ```
 Verify the deployment
