@@ -2,7 +2,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-
 ### FETCH AVAILABLE AZs ###
 data "aws_availability_zones" "available" {}
 
@@ -154,7 +153,6 @@ resource "aws_eks_node_group" "eks_nodes" {
   instance_types = ["t3.medium"]
 }
 
-
 ### ALB ###
 resource "aws_lb" "app_alb" {
   name               = "${var.cluster_name}-alb"
@@ -192,16 +190,17 @@ resource "aws_lb_listener" "http_listener" {
   }
 }
 
+### INTERNET GATEWAY ###
 resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.eks_vpc.id  # Correct reference to the VPC
 }
 
+### ROUTE TABLE ###
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.eks_vpc.id  # Correct reference to the VPC
   
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
 }
-
