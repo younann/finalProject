@@ -154,10 +154,6 @@ resource "aws_eks_node_group" "eks_nodes" {
   instance_types = ["t3.medium"]
 }
 
-### ECR ###
-resource "aws_ecr_repository" "python_app_repo" {
-  name = var.ecr_repo_name
-}
 
 ### ALB ###
 resource "aws_lb" "app_alb" {
