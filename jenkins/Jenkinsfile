@@ -1,13 +1,14 @@
 pipeline {
     agent any
 
+    //arguments on whether we want to create the resource
     parameters {
         booleanParam(name: 'DESTROY_ENV', defaultValue: false, description: 'Destroy environment after deployment?')
         booleanParam(name: 'SKIP_TERRAFORM', defaultValue: false, description: 'Skip Terraform deployment?')
 
     }
 
-    environment {
+    environment {//global parameters
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2'
@@ -17,13 +18,13 @@ pipeline {
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout Code') {// check the code
             steps {
                 git branch: 'main', url: 'https://github.com/younann/finalProject.git'
             }
         }
 
-        stage('AWS Authentication') {
+        stage('AWS Authentication') {// set aws cli for our code
             steps {
                 sh '''
                     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
@@ -34,7 +35,7 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') { 
+        stage('Build Docker Image') { //this will set a docker image in  our Elastic Container Registry on aws
             steps { 
                 script {
                     sh """
@@ -46,7 +47,7 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push Docker Image') { //this will push our dockerfile to the image in our ECR
             steps {
                 script {
                     sh """
@@ -57,9 +58,9 @@ pipeline {
             }
         }
 
-         stage('Terraform Init & Apply') {
+         stage('Terraform Init & Apply') { // this will create all the resource we need to run the app on aws
             when {
-                expression { return !params.SKIP_TERRAFORM }
+                expression { return !params.SKIP_TERRAFORM } // if we already created the resource we can skip this stage
             }
             steps {
                 dir('infra') {
@@ -69,7 +70,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes') { // install kubernetes
             steps {
                 withKubeConfig([credentialsId: 'kubelogin']) {
                     sh '''
@@ -80,7 +81,7 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify Deployment') { //check if all was installed
             steps {
                 script {
                     sh '''
