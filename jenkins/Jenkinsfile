@@ -6,11 +6,12 @@ pipeline {
     }
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')  // Ensure correct credential IDs
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2'
         ECR_REPO_NAME         = 'python-app-repo'
         IMAGE_TAG             = 'latest'
+        ECR_URL               = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
     }
 
     stages {
@@ -20,70 +21,66 @@ pipeline {
             }
         }
 
-        stage('Configure AWS CLI') {
+        stage('AWS Authentication') {
             steps {
                 sh '''
                     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
                     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
                     aws configure set region $AWS_DEFAULT_REGION
+                    aws sts get-caller-identity
                 '''
             }
         }
 
-	stage('Build') { 
+        stage('Build Docker Image') { 
             steps { 
-               withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
-                 script{
-                 app =  docker.build("devsecops")
-                 }
-               }
-            }
-    }
-
-	stage('Push') {
-            steps {
-                script{
-                    docker.withRegistry('211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops', 'ecr:us-west-2:aws-credentials') {
-                    app.push("latest")
-                    }
-                }
-            }
-    	}
-	   
-	
-        
-
-        stage('Terraform Init') {
-            steps {
-                dir('infra') {
-                    sh 'terraform init'
+                script {
+                    sh """
+                        aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+                        docker login --username AWS --password-stdin $ECR_URL
+                        docker build -t $ECR_URL:$IMAGE_TAG -f Dockerfile .
+                    """
                 }
             }
         }
 
-        stage('Terraform Apply') {
+        stage('Push Docker Image') {
             steps {
-                dir('infra') {
+                script {
+                    sh """
+                        docker tag $ECR_URL:$IMAGE_TAG $ECR_URL:$IMAGE_TAG
+                        docker push $ECR_URL:$IMAGE_TAG
+                    """
+                }
+            }
+        }
+
+        stage('Terraform Init & Apply') {
+            steps {
+                dir('infra/terraform') {
+                    sh 'terraform init'
                     sh 'terraform apply -auto-approve'
                 }
             }
         }
 
-   stage('Kubernetes Deployment of python Application') {
-	   steps {
-	      withKubeConfig([credentialsId: 'kubelogin']) {
-		  sh('kubectl delete all --all -n devsecops')
-		  sh ('kubectl apply -f test.yaml --namespace=devsecops')
-		}
-	      }
-   	}
+        stage('Deploy to Kubernetes') {
+            steps {
+                withKubeConfig([credentialsId: 'kubelogin']) {
+                    sh '''
+                        kubectl apply -f test.yaml --namespace=devsecops
+                        kubectl rollout restart deployment my-app -n devsecops
+                    '''
+                }
+            }
+        }
 
         stage('Verify Deployment') {
             steps {
                 script {
                     sh '''
                         echo "Waiting for deployment to be ready..."
-                        kubectl wait --for=condition=available --timeout=300s deployment/my-app
+                        kubectl wait --for=condition=available --timeout=300s deployment/my-app -n devsecops
                         echo "Deployment is ready!"
                     '''
                 }
@@ -93,10 +90,10 @@ pipeline {
         stage('Terraform Destroy Option') {
             when {
                 beforeAgent true
-                expression { return params.DESTROY_ENV }  // Runs only if DESTROY_ENV is set to true
+                expression { return params.DESTROY_ENV }
             }
             steps {
-                dir('infra') {
+                dir('infra/terraform') {
                     sh 'terraform destroy -auto-approve'
                 }
             }
@@ -104,12 +101,12 @@ pipeline {
 
         stage('Cleanup on Failure') {
             when {
-                expression { return currentBuild.result == 'FAILURE' }
+                expression { currentBuild.result == 'FAILURE' || currentBuild.result == null }
             }
             steps {
                 script {
                     echo "Pipeline failed. Cleaning up resources..."
-                    dir('infra') {
+                    dir('infra/terraform') {
                         sh 'terraform destroy -auto-approve'
                     }
                 }
@@ -126,6 +123,7 @@ pipeline {
         }
     }
 }
+
 
 
 
