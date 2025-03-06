@@ -5,7 +5,7 @@ variable "aws_region" {
 
 variable "cluster_name" {
   description = "Name of the EKS cluster"
-  default     = "DevSecOps-eks-cluster"
+  default     = "devsecops-eks-cluster"
 }
 
 variable "ecr_repo_name" {
