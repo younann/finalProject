@@ -48,7 +48,7 @@ pipeline {
         
         stage('Run Unit Tests') {
             steps {
-                sh 'docker run --rm $IMAGE_NAME:latest pytest'
+                sh 'docker run --rm $ECR_URL:$IMAGE_TAG pytest'
             }
         }
 
