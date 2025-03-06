@@ -43,7 +43,7 @@ pipeline {
 	stage('Push') {
             steps {
                 script{
-                    docker.withRegistry('https://145988340565.dkr.ecr.us-west-2.amazonaws.com', 'ecr:us-west-2:aws-credentials') {
+                    docker.withRegistry('211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops', 'ecr:us-west-2:aws-credentials') {
                     app.push("latest")
                     }
                 }
@@ -73,7 +73,7 @@ pipeline {
 	   steps {
 	      withKubeConfig([credentialsId: 'kubelogin']) {
 		  sh('kubectl delete all --all -n devsecops')
-		  sh ('kubectl apply -f deployment.yaml --namespace=devsecops')
+		  sh ('kubectl apply -f test.yaml --namespace=devsecops')
 		}
 	      }
    	}
@@ -102,7 +102,7 @@ pipeline {
             }
         }
 
-        stage('Cleanup') {
+        stage('Cleanup on Failure') {
             when {
                 expression { return currentBuild.result == 'FAILURE' }
             }
