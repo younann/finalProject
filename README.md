@@ -60,7 +60,7 @@ docker run -p 8000:8000 python-devsecops
 
 ## Terraform script
 
-connecting to AWS
+Connecting to AWS
 
 run
 ```bash
@@ -68,9 +68,9 @@ aws configure
 ```
 
 ```bash
-AWS Access Key ID: AKIATCKARGM6UYT2J76M
+AWS Access Key ID: AKI**********8***
 AWS Secret Access Key: ***************************
-Default region name: us-east-1
+Default region name: us-west-2
 Default output format: json
 ```
 
@@ -86,6 +86,33 @@ kubectl get pods -n default
 ```
 
 aws configure
+
+
+## Jenkins(Ci/CD)
+
+Create an AWS instance to run Jenkins-server
+
+Install Java and Jenkins
+```bash
+sudo apt update -y
+sudo apt install openjdk-11-jdk
+
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update -y
+sudo apt install jenkins -y
+
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+```
+
+
+Create a jenkinsfile to run deployment
+
+stages:
+
+Connect to AWS ->Build docker image -> Run Unit Tests-> Push it to ECR -> Run Terrform to create resource (Optional) -> Deploy to Kubernetes -> Post-Deployment Test -> Destroy all Resources (Optional)
+
 
 
 
