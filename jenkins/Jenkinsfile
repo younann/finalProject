@@ -45,6 +45,12 @@ pipeline {
                 }
             }
         }
+        
+        stage('Run Unit Tests') {
+            steps {
+                sh 'docker run --rm $IMAGE_NAME:latest pytest'
+            }
+        }
 
         stage('Push Docker Image') { //this will push our dockerfile to the image in our ECR
             steps {
@@ -80,7 +86,7 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') { //check if all was installed
+        stage('Post-Deployment Test') { //check if all was installed
             steps {
                 script {
                     sh '''
