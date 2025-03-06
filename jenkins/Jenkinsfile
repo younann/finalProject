@@ -3,7 +3,6 @@ pipeline {
 
     //arguments on whether we want to create the resource
     parameters {
-        booleanParam(name: 'DESTROY_ENV', defaultValue: false, description: 'Destroy environment after deployment?')
         booleanParam(name: 'SKIP_TERRAFORM', defaultValue: false, description: 'Skip Terraform deployment?')
 
     }
@@ -93,16 +92,37 @@ pipeline {
             }
         }
 
-    stage('Terraform Destroy Option') {
-        when {
-            expression { return params.DESTROY_ENV && !params.SKIP_TERRAFORM }
-        }
-        steps {
-            dir('infra') {
-                sh 'terraform destroy -auto-approve'
+  stage('Destroy all Resources Option') {
+            when {
+                expression { return !params.SKIP_TERRAFORM }
+            }
+            steps {
+                script {
+                    // Prompt the user for confirmation
+                    def userInput = input(
+                        id: 'userInput', 
+                        message: 'Do you want to destroy the Terraform environment?', 
+                        parameters: [
+                            choice(
+                                name: 'confirmDestroy', 
+                                choices: ['Yes', 'No'], 
+                                description: 'Choose "Yes" to destroy or "No" to skip.'
+                            )
+                        ]
+                    )
+
+                    // Proceed only if the user chooses "Yes"
+                    if (userInput == 'Yes') {
+                        dir('infra') {
+                            sh 'terraform destroy -auto-approve'
+                        }
+                        echo "Terraform environment destroyed."
+                    } else {
+                        echo "Terraform destroy skipped."
+                    }
+                }
             }
         }
-    }
 
         stage('Cleanup on Failure') {
             when {
