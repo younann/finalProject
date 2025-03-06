@@ -11,11 +11,11 @@ variable "cluster_name" {
 
 variable "s3_bucket_name" {
   description = "S3 bucket for Terraform state or application storage"
-  default     = "DevSecOps-eks-app-bucket"
+  default     = "devsecops-eks-app-bucket"
 }
 
 variable "dynamodb_table_name" {
   description = "DynamoDB table for Terraform state locking or app storage"
-  default     = "DevSecOps-eks-app-table"
+  default     = "devsecops-eks-app-table"
 }
 
