@@ -80,8 +80,6 @@ stage('Build Docker Image') {
   stage('Generate kubeconfig') {
     steps {
         script {
-            // Retrieve EKS cluster name from Terraform output
-            def clusterName = sh(script: "terraform output -raw eks_cluster_name", returnStdout: true).trim()
 
             // Generate kubeconfig file
             sh """
