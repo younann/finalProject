@@ -104,8 +104,7 @@ stage('Verify Kubernetes Connection') {
                     // Use the dynamically generated kubeconfig
                     sh "kubectl create namespace devsecops"
                     sh "kubectl get pods"
-                    sh "envsubst < k8s/test.yaml > k8s/test-deploy.yaml"
-                    sh "kubectl apply -f k8s/test-deploy.yaml"
+                    sh "kubectl apply -f k8s/test.yaml"
                 }
             }
         }
