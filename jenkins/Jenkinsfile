@@ -151,11 +151,12 @@ stage('Build Docker Image') {
 
     post {
         echo 'Failed to deploy EKS cluster or application. Running cleanup...'
-        sh "echo 'your_password' | sudo -S docker system prune -a -f" // Replace with your password or configure passwordless sudo
+        
         // Optionally, run terraform destroy here if needed
         dir('infra') {
             sh 'terraform destroy -auto-approve'
         }
+        sh 'sudo -S docker system prune -a -f'
     }
 }
 
