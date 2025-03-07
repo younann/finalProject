@@ -47,7 +47,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'docker run --rm $ECR_URL:$IMAGE_TAG pytest'
+                sh 'docker run --rm -e PYTHONPATH=/app -w /app $ECR_URL:$IMAGE_TAG pytest'
             }
         }
 
