@@ -1,13 +1,12 @@
 pipeline {
     agent any
 
-    //arguments on whether we want to create the resource
+    // Arguments on whether we want to create the resource
     parameters {
         booleanParam(name: 'SKIP_TERRAFORM', defaultValue: false, description: 'Skip Terraform deployment?')
-
     }
 
-    environment {//global parameters
+    environment { // Global parameters
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2'
@@ -17,13 +16,13 @@ pipeline {
     }
 
     stages {
-        stage('Checkout Code') {// check the code
+        stage('Checkout Code') { // Check the code
             steps {
                 git branch: 'main', url: 'https://github.com/younann/finalProject.git'
             }
         }
 
-        stage('AWS Authentication') {// set aws cli for our code
+        stage('AWS Authentication') { // Set AWS CLI for our code
             steps {
                 sh '''
                     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
@@ -34,7 +33,7 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') { //this will set a docker image in  our Elastic Container Registry on aws
+        stage('Build Docker Image') { // Build a Docker image in our Elastic Container Registry on AWS
             steps { 
                 script {
                     sh """
@@ -45,14 +44,14 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Run Unit Tests') {
             steps {
                 sh 'docker run --rm $ECR_URL:$IMAGE_TAG pytest'
             }
         }
 
-        stage('Push Docker Image') { //this will push our dockerfile to the image in our ECR
+        stage('Push Docker Image') { // Push the Docker image to ECR
             steps {
                 script {
                     sh """
@@ -63,9 +62,9 @@ pipeline {
             }
         }
 
-         stage('Terraform Init & Apply') { // this will create all the resource we need to run the app on aws
+        stage('Terraform Init & Apply') { // Create AWS resources using Terraform
             when {
-                expression { return !params.SKIP_TERRAFORM } // if we already created the resource we can skip this stage
+                expression { return !params.SKIP_TERRAFORM } // If already created, we can skip this stage
             }
             steps {
                 dir('infra') {
@@ -75,7 +74,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') { // install kubernetes
+        stage('Deploy to Kubernetes') { // Deploy the application to Kubernetes
             steps {
                 withKubeConfig([credentialsId: 'kubelogin']) {
                     sh '''
@@ -86,29 +85,28 @@ pipeline {
             }
         }
 
-        stage('Post-Deployment Test') { //check if all was installed
+        stage('Post-Deployment Test') { // Check if everything was installed correctly
             steps {
                 script {
-    def serviceUrl = sh(script: "kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'", returnStdout: true).trim()
-    echo "Service available at http://$serviceUrl"
-    
-    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://$serviceUrl", returnStdout: true).trim()
-    if (response != "200") {
-        error("Post-deployment test failed! Service is unreachable.")
-    } else {
-        echo "Service is up and running!"
-    }
+                    def serviceUrl = sh(script: "kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'", returnStdout: true).trim()
+                    echo "Service available at http://$serviceUrl"
 
+                    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://$serviceUrl", returnStdout: true).trim()
+                    if (response != "200") {
+                        error("Post-deployment test failed! Service is unreachable.")
+                    } else {
+                        echo "Service is up and running!"
+                    }
+                }
             }
-        }}
+        }
 
-  stage('Destroy all Resources Option') {
+        stage('Destroy all Resources Option') { // Option to destroy Terraform resources
             when {
                 expression { return !params.SKIP_TERRAFORM }
             }
             steps {
                 script {
-                    // Prompt the user for confirmation
                     def userInput = input(
                         id: 'userInput', 
                         message: 'Do you want to destroy the Terraform environment?', 
@@ -121,7 +119,6 @@ pipeline {
                         ]
                     )
 
-                    // Proceed only if the user chooses "Yes"
                     if (userInput == 'Yes') {
                         dir('infra') {
                             sh 'terraform destroy -auto-approve'
@@ -141,7 +138,7 @@ pipeline {
             steps {
                 script {
                     echo "Pipeline failed. Cleaning up resources..."
-                    dir('infra/terraform') {
+                    dir('infra') {
                         sh 'terraform destroy -auto-approve'
                     }
                 }
@@ -158,8 +155,6 @@ pipeline {
         }
     }
 }
-}
-
 
 
 
