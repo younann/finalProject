@@ -154,7 +154,7 @@ stage('Build Docker Image') {
             echo 'EKS cluster and application deployed successfully!'
         }
         failure {
-            sh " sudo docker system prune -a "
+            sh "sudo -S docker system prune -a -f"
             echo 'Failed to deploy EKS cluster or application.'
         }
     }
