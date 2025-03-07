@@ -79,7 +79,7 @@ pipeline {
             steps {
                 withKubeConfig([credentialsId: 'kubelogin']) {
                     sh '''
-                        kubectl apply -f test.yaml --namespace=devsecops
+                        kubectl apply -f k8s/test.yaml --namespace=devsecops
                         kubectl rollout restart deployment my-app -n devsecops
                     '''
                 }
