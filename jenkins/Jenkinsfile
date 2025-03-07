@@ -104,27 +104,49 @@ stage('Verify Kubernetes Connection') {
                     // Use the dynamically generated kubeconfig
                     sh "kubectl create namespace devsecops"
                     sh "kubectl get pods"
-                    sh "kubectl apply -f k8s/test.yaml"
+                    sh "envsubst < k8s/test.yaml > k8s/test-deploy.yaml"
+                    sh "kubectl apply -f k8s/test-deploy.yaml"
                 }
             }
         }
     
 
-        stage('Post-Deployment Test') { // Check if everything was installed correctly
-            steps {
-                script {
-                    def serviceUrl = sh(script: "kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'", returnStdout: true).trim()
-                    echo "Service available at http://$serviceUrl"
+stage('Post-Deployment Test') {
+    steps {
+        script {
+            // Get LoadBalancer hostname or ClusterIP
+            def serviceUrl = ""
+            def retries = 10
+            def waitTime = 30 // seconds
 
-                    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://$serviceUrl", returnStdout: true).trim()
-                    if (response != "200") {
-                        error("Post-deployment test failed! Service is unreachable.")
-                    } else {
-                        echo "Service is up and running!"
-                    }
+            for (int i = 0; i < retries; i++) {
+                serviceUrl = sh(script: """
+                    kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || \
+                    kubectl get svc my-app -n devsecops -o jsonpath='{.spec.clusterIP}'
+                """, returnStdout: true).trim()
+                if (serviceUrl) {
+                    break
                 }
+                echo "LoadBalancer not yet provisioned. Retrying in $waitTime seconds..."
+                sleep(waitTime)
+            }
+
+            if (!serviceUrl) {
+                error("Failed to retrieve service URL after $retries retries.")
+            }
+
+            echo "Service available at http://$serviceUrl"
+
+            // Test service availability
+            def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://$serviceUrl || echo '000'", returnStdout: true).trim()
+            if (response != "200") {
+                error("Post-deployment test failed! Service returned HTTP code: $response")
+            } else {
+                echo "Service is up and running!"
             }
         }
+    }
+}
 
         stage('Destroy all Resources Option') { // Option to destroy Terraform resources
             when {
