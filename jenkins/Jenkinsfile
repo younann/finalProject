@@ -103,7 +103,8 @@ stage('Verify Kubernetes Connection') {
                 script {
                     // Use the dynamically generated kubeconfig
                     sh "kubectl create namespace devsecops"
-                    sh "kubectl get pods"
+                    sh "kubectl get pods -n devsecops"
+
                     sh "kubectl apply -f k8s/test.yaml"
                 }
             }
@@ -137,23 +138,23 @@ stage('Post-Deployment Test') {
             def waitTime = 3 // seconds
 
             for (int i = 0; i < retries; i++) {
-                def serviceStatus = sh(script: "kubectl get svc my-app -n devsecops --ignore-not-found", returnStdout: true).trim()
+                def serviceStatus = sh(script: "kubectl get svc python-app-service -n devsecops --ignore-not-found", returnStdout: true).trim()
                 if (serviceStatus) {
                     serviceExists = true
                     break
                 }
-                echo "Service 'my-app' not found. Retrying in $waitTime seconds..."
+                echo "Service 'python-app-service' not found. Retrying in $waitTime seconds..."
                 sleep(waitTime)
             }
 
             if (!serviceExists) {
-                error("Service 'my-app' not found after $retries retries.")
+                error("Service 'python-app-service' not found after $retries retries.")
             }
 
             // Get LoadBalancer hostname or ClusterIP
             def serviceUrl = sh(script: """
-                kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || \
-                kubectl get svc my-app -n devsecops -o jsonpath='{.spec.clusterIP}'
+                kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || \
+                kubectl get svc python-app-service -n devsecops -o jsonpath='{.spec.clusterIP}'
             """, returnStdout: true).trim()
 
             echo "Service available at http://$serviceUrl"
