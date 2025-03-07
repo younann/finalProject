@@ -55,7 +55,6 @@ resource "aws_subnet" "eks_subnets" {
   availability_zone = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true  # Ensure nodes get public IPs
 
-
   tags = {
     Name                                      = "${var.cluster_name}-subnet-${count.index}"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
@@ -98,6 +97,11 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+
 resource "aws_eks_cluster" "eks_cluster" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_role.arn
@@ -125,12 +129,6 @@ resource "aws_iam_role" "eks_node_group_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.eks_cluster_role.name
-}
-
-
 resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.eks_node_group_role.name
@@ -138,10 +136,6 @@ resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
 
 resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node_group_role.name
-}
-resource "aws_iam_role_policy_attachment" "eks_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSNodePolicy"
   role       = aws_iam_role.eks_node_group_role.name
 }
 
@@ -204,20 +198,22 @@ resource "aws_lb_listener" "http_listener" {
 
 ### INTERNET GATEWAY ###
 resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.eks_vpc.id  # Correct reference to the VPC
+  vpc_id = aws_vpc.eks_vpc.id
 }
 
 ### ROUTE TABLE ###
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.eks_vpc.id  # Correct reference to the VPC
-  
+  vpc_id = aws_vpc.eks_vpc.id
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
 }
+
 resource "aws_route_table_association" "public_assoc" {
   count          = 2
   subnet_id      = aws_subnet.eks_subnets[count.index].id
   route_table_id = aws_route_table.public.id
 }
+
