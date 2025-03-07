@@ -109,31 +109,53 @@ stage('Verify Kubernetes Connection') {
                 }
             }
         }
-    
+    stage('Manual Approval') {
+            steps {
+                script {
+                    // Pause the pipeline and wait for manual approval
+                    def proceed = input(
+                        id: 'Proceed', 
+                        message: 'Do you want to proceed to the next stage?', 
+                        parameters: [
+                            choice(choices: ['Yes', 'No'], description: 'Select an option', name: 'approval')
+                        ]
+                    )
+
+                    // Check the user's choice
+                    if (proceed != 'Yes') {
+                        error("Pipeline stopped by user.")
+                    }
+                }
+            }
+        }
 
 stage('Post-Deployment Test') {
     steps {
         script {
-            // Get LoadBalancer hostname or ClusterIP
-            def serviceUrl = ""
+            // Wait for the service to be created
+            def serviceExists = false
             def retries = 10
             def waitTime = 30 // seconds
 
             for (int i = 0; i < retries; i++) {
-                serviceUrl = sh(script: """
-                    kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || \
-                    kubectl get svc my-app -n devsecops -o jsonpath='{.spec.clusterIP}'
-                """, returnStdout: true).trim()
-                if (serviceUrl) {
+                def serviceStatus = sh(script: "kubectl get svc my-app -n devsecops --ignore-not-found", returnStdout: true).trim()
+                if (serviceStatus) {
+                    serviceExists = true
                     break
                 }
-                echo "LoadBalancer not yet provisioned. Retrying in $waitTime seconds..."
+                echo "Service 'my-app' not found. Retrying in $waitTime seconds..."
                 sleep(waitTime)
             }
 
-            if (!serviceUrl) {
-                error("Failed to retrieve service URL after $retries retries.")
+            if (!serviceExists) {
+                error("Service 'my-app' not found after $retries retries.")
             }
+
+            // Get LoadBalancer hostname or ClusterIP
+            def serviceUrl = sh(script: """
+                kubectl get svc my-app -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || \
+                kubectl get svc my-app -n devsecops -o jsonpath='{.spec.clusterIP}'
+            """, returnStdout: true).trim()
 
             echo "Service available at http://$serviceUrl"
 
