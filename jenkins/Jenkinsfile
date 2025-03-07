@@ -86,20 +86,30 @@ stage('Build Docker Image') {
     }
 }
 
- stage('Deploy to Kubernetes') {
-    steps {
-        script {
-            try {
-                // Apply the Kubernetes manifest (test.yaml) from the k8s folder
-                sh "kubectl apply -f k8s/test.yaml --namespace=devsecops"
-                // Restart the deployment
-                sh "kubectl rollout restart deployment my-app -n devsecops"
-            } catch (Exception e) {
-                error "Kubernetes deployment failed: ${e.getMessage()}"
+        stage('Generate kubeconfig') {
+            steps {
+                script {
+                    // Retrieve EKS cluster name from Terraform output
+                    def clusterName = sh(script: "terraform output -raw eks_cluster_name", returnStdout: true).trim()
+
+                    // Generate kubeconfig file
+                    sh """
+                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${clusterName}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    // Use the dynamically generated kubeconfig
+                    sh "kubectl get pods"
+                    sh "kubectl apply -f k8s/deployment.yaml"
+                }
             }
         }
     }
-}
 
         stage('Post-Deployment Test') { // Check if everything was installed correctly
             steps {
