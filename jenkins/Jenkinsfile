@@ -100,7 +100,7 @@ pipeline {
     }
 
             }
-        }
+        }}
 
   stage('Destroy all Resources Option') {
             when {
