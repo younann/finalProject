@@ -109,7 +109,7 @@ stage('Verify Kubernetes Connection') {
                 }
             }
         }
-    }
+    
 
         stage('Post-Deployment Test') { // Check if everything was installed correctly
             steps {
