@@ -18,8 +18,9 @@ USER appuser
 EXPOSE 5000
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app  # Fix pytest import issue
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-CMD ["python", "-m", "app.main"] 
+CMD ["python", "-m", "app.main"]
