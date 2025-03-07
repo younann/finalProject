@@ -39,7 +39,7 @@ stage('Build Docker Image') {
             // Enable BuildKit and build the Docker image
             sh "DOCKER_BUILDKIT=1 docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
         }
-    }
+    }}
 
         stage('Run Unit Tests') {
             steps {
