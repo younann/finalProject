@@ -85,7 +85,7 @@ stage('Build Docker Image') {
 
             // Generate kubeconfig file
             sh """
-                aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${clusterName}
+                aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
             """
         }
     }
