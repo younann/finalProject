@@ -102,6 +102,7 @@ stage('Verify Kubernetes Connection') {
             steps {
                 script {
                     // Use the dynamically generated kubeconfig
+                    sh "kubectl create namespace devsecops"
                     sh "kubectl get pods"
                     sh "kubectl apply -f k8s/test.yaml"
                 }
