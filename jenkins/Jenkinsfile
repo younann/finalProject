@@ -77,7 +77,21 @@ stage('Build Docker Image') {
                 }
             }
         }
-        stage('Verify Kubernetes Connection') {
+  stage('Generate kubeconfig') {
+    steps {
+        script {
+            // Retrieve EKS cluster name from Terraform output
+            def clusterName = sh(script: "terraform output -raw eks_cluster_name", returnStdout: true).trim()
+
+            // Generate kubeconfig file
+            sh """
+                aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${clusterName}
+            """
+        }
+    }
+}
+
+stage('Verify Kubernetes Connection') {
     steps {
         script {
             // Check cluster info to ensure kubectl is connected properly
@@ -86,26 +100,12 @@ stage('Build Docker Image') {
     }
 }
 
-        stage('Generate kubeconfig') {
-            steps {
-                script {
-                    // Retrieve EKS cluster name from Terraform output
-                    def clusterName = sh(script: "terraform output -raw eks_cluster_name", returnStdout: true).trim()
-
-                    // Generate kubeconfig file
-                    sh """
-                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${clusterName}
-                    """
-                }
-            }
-        }
-
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     // Use the dynamically generated kubeconfig
                     sh "kubectl get pods"
-                    sh "kubectl apply -f k8s/deployment.yaml"
+                    sh "kubectl apply -f k8s/test.yaml"
                 }
             }
         }
