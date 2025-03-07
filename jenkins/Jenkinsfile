@@ -33,14 +33,13 @@ pipeline {
             }
         }
 
-         stage('Build Docker Image') {
-            steps {
-                script {
-                    // Build the Docker image using the Dockerfile in the repository
-                    sh "docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
-                }
-            }
+stage('Build Docker Image') {
+    steps {
+        script {
+            // Enable BuildKit and build the Docker image
+            sh "DOCKER_BUILDKIT=1 docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
         }
+    }
 
         stage('Run Unit Tests') {
             steps {
