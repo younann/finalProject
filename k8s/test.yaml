@@ -1,20 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: python-app
+  name: my-app
+  namespace: devsecops
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: python-app
+      app: my-app
   template:
     metadata:
       labels:
-        app: python-app
+        app: my-app
     spec:
       containers:
-        - name: python-app
-          image: IMAGE_PLACEHOLDER
-          ports:
-            - containerPort: 5000
+      - name: my-app
+        image: ${ECR_URL}:${IMAGE_TAG}
+        ports:
+        - containerPort: 80
 
