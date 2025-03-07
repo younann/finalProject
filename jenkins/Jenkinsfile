@@ -149,15 +149,19 @@ stage('Build Docker Image') {
         }
     }
 
-    post {
+ post {
+    success {
+        echo 'EKS cluster and application deployed successfully!'
+    }
+    failure {
         echo 'Failed to deploy EKS cluster or application. Running cleanup...'
-        
         // Optionally, run terraform destroy here if needed
         dir('infra') {
             sh 'terraform destroy -auto-approve'
         }
-        sh 'sudo -S docker system prune -a -f'
     }
+}
+
 }
 
 
