@@ -33,13 +33,11 @@ pipeline {
             }
         }
 
-        stage('Build') { 
-            steps { 
-                withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
-                    script {
-                        // Assuming Dockerfile is in the root directory
-                        app = docker.build("${ECR_REPO_NAME}:${IMAGE_TAG}")
-                    }
+         stage('Build Docker Image') {
+            steps {
+                script {
+                    // Build the Docker image using the Dockerfile in the repository
+                    sh "docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
                 }
             }
         }
@@ -50,12 +48,20 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push Docker Image to ECR') {
             steps {
                 script {
-                    docker.withRegistry("https://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com", 'ecr:us-west-2:aws-credentials') {
-                        app.push("${IMAGE_TAG}")
-                    }
+                    // Authenticate Docker to ECR
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                        docker login --username AWS --password-stdin ${ECR_URL}
+                    '''
+
+                    // Tag the Docker image for ECR
+                    sh "docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG}"
+
+                    // Push the Docker image to ECR
+                    sh "docker push ${ECR_URL}:${IMAGE_TAG}"
                 }
             }
         }
@@ -72,13 +78,12 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') { // Deploy the application to Kubernetes
+        stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig([credentialsId: 'kubelogin']) {
-                    sh '''
-                        kubectl apply -f k8s/test.yaml --namespace=devsecops
-                        kubectl rollout restart deployment my-app -n devsecops
-                    '''
+                script {
+                    // Apply the Kubernetes manifest (test.yaml) from the k8s folder
+                    sh "kubectl apply -f k8s/test.yaml --namespace=devsecops"
+                    sh "kubectl rollout restart deployment my-app -n devsecops"
                 }
             }
         }
