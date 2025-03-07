@@ -37,7 +37,7 @@ stage('Build Docker Image') {
     steps {
         script {
             // Enable BuildKit and build the Docker image
-            sh "DOCKER_BUILDKIT=1 docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
+            sh "docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
         }
     }}
 
