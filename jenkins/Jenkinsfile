@@ -33,10 +33,11 @@ pipeline {
             }
         }
 
-         stage('Build') { 
+        stage('Build') { 
             steps { 
                 withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
                     script {
+                        // Assuming Dockerfile is in the root directory
                         app = docker.build("${ECR_REPO_NAME}:${IMAGE_TAG}")
                     }
                 }
@@ -49,8 +50,8 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') { // Push the Docker image to ECR
-             steps {
+        stage('Push Docker Image') {
+            steps {
                 script {
                     docker.withRegistry("https://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com", 'ecr:us-west-2:aws-credentials') {
                         app.push("${IMAGE_TAG}")
