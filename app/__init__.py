@@ -1,1 +1,2 @@
-# Empty file to make the directory a Python package 
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000)
