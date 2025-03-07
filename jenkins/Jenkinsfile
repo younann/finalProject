@@ -41,11 +41,7 @@ stage('Build Docker Image') {
         }
     }}
 
-        stage('Run Unit Tests') {
-            steps {
-                sh 'docker run --rm -e PYTHONPATH=/app -w /app ${ECR_REPO_NAME}:${IMAGE_TAG} pytest'
-            }
-        }
+  
 
         stage('Push Docker Image to ECR') {
             steps {
@@ -62,6 +58,11 @@ stage('Build Docker Image') {
                     // Push the Docker image to ECR
                     sh "docker push ${ECR_URL}:${IMAGE_TAG}"
                 }
+            }
+        }
+              stage('Run Unit Tests') {
+            steps {
+                sh 'docker run --rm -e PYTHONPATH=/app -w /app ${ECR_REPO_NAME}:${IMAGE_TAG} pytest'
             }
         }
 
