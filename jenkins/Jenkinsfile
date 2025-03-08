@@ -104,7 +104,7 @@ stage('Verify Kubernetes Connection') {
      stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh "aws eks update-kubeconfig --name devsecops-eks-cluste --region ${AWS_DEFAULT_REGION}"
+                    sh "aws eks update-kubeconfig --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION}"
                     sh "kubectl get nodes"
                     sh "kubectl create namespace devsecops || true"
                     sh "kubectl get pods -n devsecops"
