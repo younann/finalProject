@@ -216,18 +216,4 @@ resource "aws_route_table_association" "public_assoc" {
   subnet_id      = aws_subnet.eks_subnets[count.index].id
   route_table_id = aws_route_table.public.id
 }
-data "external" "oidc_thumbprint" {
-  depends_on = [aws_eks_cluster.eks_cluster]
-  program = [
-    "bash",
-    "${path.module}/get_thumbprint.sh",
-    replace(aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer, "https://", "")
-  ]
-}
-
-resource "aws_iam_openid_connect_provider" "eks" {
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.external.oidc_thumbprint.result.thumbprint]
-  url             = aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer
-}
 
