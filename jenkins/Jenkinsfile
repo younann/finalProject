@@ -108,7 +108,7 @@ stage('Verify Kubernetes Connection') {
                     sh "kubectl get nodes"
                     sh "kubectl create namespace devsecops || true"
                     sh "kubectl get pods -n devsecops"
-                    sh "kubectl apply -f k8s/test.yaml"
+                    sh "kubectl apply -f k8s/deployment.yaml"
                     
                     sh "kubectl get pods -n devsecops"
                     sh "kubectl describe deployment python-app -n devsecops"
