@@ -109,6 +109,8 @@ stage('Verify Kubernetes Connection') {
                     sh "kubectl create namespace devsecops || true"
                     sh "kubectl get pods -n devsecops"
                     sh "kubectl apply -f k8s/test.yaml"
+                    sh "kubectl get pods -n devsecops"
+                    sh "kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
                 }
             }
         }
