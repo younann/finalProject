@@ -101,17 +101,22 @@ stage('Verify Kubernetes Connection') {
     }
 }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    // Use the dynamically generated kubeconfig
-                    sh "kubectl create namespace devsecops"
-                    sh "kubectl get pods -n devsecops"
-
-                    sh "kubectl apply -f k8s/test.yaml"
-                }
-            }
+stage('Deploy to Kubernetes') {
+    steps {
+        script {
+            // Ensure the kubeconfig is updated to target your new EKS cluster.
+            sh "aws eks update-kubeconfig --name devsecops --region ${AWS_REGION}"
+            // Confirm that nodes are registered
+            sh "kubectl get nodes"
+            // Create namespace if not exists
+            sh "kubectl create namespace devsecops || true"
+            // Check pods in the namespace (likely empty until deployments occur)
+            sh "kubectl get pods -n devsecops"
+            // Apply your Kubernetes manifests
+            sh "kubectl apply -f k8s/test.yaml"
         }
+    }
+}
     stage('Manual Approval') {
             steps {
                 script {
