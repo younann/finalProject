@@ -65,33 +65,13 @@ stage('Build Docker Image') {
             }
         }
      
-        stage('Terraform Apply - Create EKS Cluster') {
+        stage('Terraform') {
             when {
                 expression { return !params.SKIP_TERRAFORM }
             }
             steps {
                 dir('infra') {
                     sh 'terraform init'
-                    // Create only the EKS cluster first
-                    sh 'terraform apply -target=aws_eks_cluster.eks_cluster -auto-approve'
-                }
-            }
-        }
-        stage('Wait for EKS OIDC Issuer Availability') {
-            when {
-                expression { return !params.SKIP_TERRAFORM }
-            }
-            steps {
-                // Optionally wait for the EKS OIDC issuer to be available
-                sh 'sleep 60'
-            }
-        }
-        stage('Terraform Apply - Create OIDC Provider and Rest') {
-            when {
-                expression { return !params.SKIP_TERRAFORM }
-            }
-            steps {
-                dir('infra') {
                     sh 'terraform apply -auto-approve'
                 }
             }
