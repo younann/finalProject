@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: python-app
-          image: ${DOCKER_REGISTRY}/my-python-app:latest
+          image: 211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
