@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: python-app
-          image: 211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops:latest  # Use actual registry URL
+          image: 211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
@@ -50,8 +50,23 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
       restartPolicy: Always
-      imagePullSecrets:
-        - name: ecr-secret  # Ensure ECR login secrets are set up
+      nodeSelector:
+        kubernetes.io/os: linux  # Ensures it runs on Linux nodes
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - arm64
 
 ---
 apiVersion: v1
@@ -65,3 +80,4 @@ spec:
     - port: 80
       targetPort: 5000
   type: LoadBalancer
+  externalTrafficPolicy: Local
