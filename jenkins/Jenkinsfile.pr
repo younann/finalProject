@@ -1,92 +1,127 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_IMAGE = 'my-python-app'
-        DOCKER_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+
+    environment { // Global parameters
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
+        AWS_DEFAULT_REGION    = 'us-west-2'
+        ECR_REPO_NAME         = 'python-app-repo'
+        IMAGE_TAG             = 'latest'
+        ECR_URL               = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') { // Check the code
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('AWS Authentication') { // Set AWS CLI for our code
             steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                }
+                sh '''
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                    aws configure set region $AWS_DEFAULT_REGION
+                    aws sts get-caller-identity
+                '''
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                script {
-                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
-                        sh 'python -m pytest tests/'
-                    }
-                }
+     
+        stage('Terraform') {
+            when {
+                expression { return !params.SKIP_TERRAFORM }
             }
-        }
-
-        stage('Terraform Validation') {
             steps {
                 dir('infra') {
-                    sh 'terraform init -backend=false'
-                    sh 'terraform validate'
-                    sh 'terraform fmt -check'
+                    sh 'terraform init'
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+    
+
+
+        
+
+    stage('click to destroy') {
+            steps {
+                script {
+                    // Pause the pipeline and wait for manual approval
+                    def proceed = input(
+                        id: 'Proceed', 
+                        message: 'Do you want to proceed to the next stage?', 
+                        parameters: [
+                            choice(choices: ['Yes', 'No'], description: 'Select an option', name: 'approval')
+                        ]
+                    )
+
+                    // Check the user's choice
+                    if (proceed != 'Yes') {
+                        error("Pipeline stopped by user.")
+                    }
                 }
             }
         }
 
-        stage('Report Status') {
+        stage('Destroy all Resources Option') { // Option to destroy Terraform resources
+            when {
+                expression { return !params.SKIP_TERRAFORM }
+            }
             steps {
                 script {
-                    // This is where you would update the PR status in GitHub/GitLab/etc.
-                    // Example for GitHub using the GitHub API plugin:
-                    if (env.CHANGE_ID) {
-                        githubPRComment(
-                            comment: "Build and tests passed successfully! ✅",
-                            statusVerifier: { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
-                        )
-                        
-                        githubPRStatusPublisher(
-                            statusMsg: [
-                                content: 'Build and tests successful',
-                                context: 'continuous-integration/jenkins',
-                                status: 'SUCCESS'
-                            ]
-                        )
+                    def userInput = input(
+                        id: 'userInput', 
+                        message: 'Do you want to destroy the Terraform environment?', 
+                        parameters: [
+                            choice(
+                                name: 'confirmDestroy', 
+                                choices: ['Yes', 'No'], 
+                                description: 'Choose "Yes" to destroy or "No" to skip.'
+                            )
+                        ]
+                    )
+
+                    if (userInput == 'Yes') {
+                        dir('infra') {
+                            sh 'terraform destroy -auto-approve'
+                        }
+                        echo "Terraform environment destroyed."
+                    } else {
+                        echo "Terraform destroy skipped."
+                    }
+                }
+            }
+        }
+
+        stage('Cleanup on Failure') {
+            when {
+                expression { currentBuild.result == 'FAILURE' || currentBuild.result == null }
+            }
+            steps {
+                script {
+                    echo "Pipeline failed. Cleaning up resources..."
+                    dir('infra') {
+                        sh 'terraform destroy -auto-approve'
                     }
                 }
             }
         }
     }
 
-    post {
-        always {
-            cleanWs()
-        }
-        failure {
-            script {
-                if (env.CHANGE_ID) {
-                    // Update PR with failure status
-                    githubPRComment(
-                        comment: "Build or tests failed! ❌ Please fix the issues before merging.",
-                        statusVerifier: { currentBuild.resultIsWorseThan('SUCCESS') }
-                    )
-                    
-                    githubPRStatusPublisher(
-                        statusMsg: [
-                            content: 'Build or tests failed',
-                            context: 'continuous-integration/jenkins',
-                            status: 'FAILURE'
-                        ]
-                    )
-                }
-            }
+ post {
+    success {
+        echo 'EKS cluster and application deployed successfully!'
+    }
+    failure {
+        echo 'Failed to deploy EKS cluster or application. Running cleanup...'
+        // Optionally, run terraform destroy here if needed
+        dir('infra') {
+            sh 'terraform destroy -auto-approve'
         }
     }
+}
+
 }
