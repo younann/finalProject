@@ -6,7 +6,7 @@ metadata:
 data:
   mapRoles: |
     - rolearn: arn:aws:iam::211125613373:role/devsecops-eks-cluster-node-role
-      username: system:node:{{EC2PrivateDNSName}}
+      username: system:node:ip-10-0-1-198.us-west-2.compute.internal
       groups:
         - system:bootstrappers
         - system:nodes
