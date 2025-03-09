@@ -1,0 +1,193 @@
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(name: 'SKIP_TERRAFORM', defaultValue: false, description: 'Skip Terraform deployment?')
+        booleanParam(name: 'FORCE_TERRAFORM', defaultValue: false, description: 'Force Terraform apply even if no changes?')
+    }
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
+        AWS_DEFAULT_REGION    = 'us-west-2'
+        ECR_REPO_NAME        = 'python-app-repo'
+        IMAGE_TAG            = 'latest'
+        ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        DOCKER_BUILDKIT      = '1' // Enable BuildKit for faster builds
+    }
+
+    stages {
+        stage('Parallel Init') {
+            parallel {
+                stage('Checkout Code') {
+                    steps {
+                        git branch: 'main', url: 'https://github.com/younann/finalProject.git'
+                    }
+                }
+                stage('AWS Authentication') {
+                    steps {
+                        sh '''
+                            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                            aws configure set region $AWS_DEFAULT_REGION
+                            aws sts get-caller-identity
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Build and Test') {
+            parallel {
+                stage('Build Docker Image') {
+                    steps {
+                        script {
+                            sh "docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
+                        }
+                    }
+                }
+                
+                stage('Terraform Plan') {
+                    when {
+                        expression { return !params.SKIP_TERRAFORM }
+                    }
+                    steps {
+                        dir('infra') {
+                            script {
+                                // First check if infrastructure exists
+                                def infraExists = sh(
+                                    script: '''
+                                        terraform init -input=false
+                                        # Check if EKS cluster exists
+                                        if aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} >/dev/null 2>&1; then
+                                            # Verify other core infrastructure components
+                                            terraform state list | grep -q "aws_eks_cluster.eks" && \
+                                            terraform state list | grep -q "aws_vpc.main" && \
+                                            echo "true" || echo "false"
+                                        else
+                                            echo "false"
+                                        fi
+                                    ''',
+                                    returnStdout: true
+                                ).trim()
+
+                                env.INFRA_EXISTS = infraExists
+
+                                if (infraExists == 'true' && !params.FORCE_TERRAFORM) {
+                                    echo "Infrastructure already exists and FORCE_TERRAFORM is false. Skipping Terraform operations."
+                                    env.TERRAFORM_CHANGES = 'false'
+                                } else {
+                                    def planResult = sh(
+                                        script: 'terraform plan -detailed-exitcode -out=tfplan',
+                                        returnStatus: true
+                                    )
+                                    // Store the plan result for later use
+                                    env.TERRAFORM_CHANGES = planResult == 2 ? 'true' : 'false'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                sh 'docker run --rm -e PYTHONPATH=/app -w /app ${ECR_REPO_NAME}:${IMAGE_TAG} pytest'
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                        docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG}
+                        docker push ${ECR_URL}:${IMAGE_TAG}
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression { 
+                    return !params.SKIP_TERRAFORM && 
+                           (env.TERRAFORM_CHANGES == 'true' || params.FORCE_TERRAFORM) &&
+                           (env.INFRA_EXISTS == 'false' || params.FORCE_TERRAFORM)
+                }
+            }
+            steps {
+                dir('infra') {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+
+        stage('Kubernetes Deploy') {
+            steps {
+                script {
+                    // Generate kubeconfig only if it doesn't exist
+                    sh '''
+                        if ! kubectl config current-context &>/dev/null; then
+                            aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
+                        fi
+                    '''
+                    
+                    // Apply Kubernetes configurations
+                    sh '''
+                        kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
+                        kubectl apply -f k8s/aws-auth.yaml
+                        kubectl apply -f k8s/test.yaml
+                    '''
+                    
+                    // Wait for deployment to be ready
+                    sh '''
+                        kubectl rollout status deployment/python-app -n devsecops --timeout=300s
+                        kubectl wait --for=condition=ready pod -l app=python-app -n devsecops --timeout=300s
+                    '''
+                }
+            }
+        }
+
+        stage('Quick Health Check') {
+            steps {
+                script {
+                    def serviceUrl = sh(
+                        script: "kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
+                        returnStdout: true
+                    ).trim()
+
+                    // Parallel health checks
+                    parallel(
+                        "HTTP Check": {
+                            sh "curl -sf http://${serviceUrl} || exit 1"
+                        },
+                        "Pod Status": {
+                            sh "kubectl get pods -n devsecops -l app=python-app -o jsonpath='{.items[*].status.phase}' | grep -q Running"
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment completed successfully!'
+        }
+        failure {
+            script {
+                if (!params.SKIP_TERRAFORM && env.TERRAFORM_CHANGES == 'true') {
+                    dir('infra') {
+                        sh 'terraform destroy -auto-approve'
+                    }
+                }
+            }
+        }
+        cleanup {
+            // Clean up local Docker images
+            sh "docker rmi ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG} || true"
+        }
+    }
+}
