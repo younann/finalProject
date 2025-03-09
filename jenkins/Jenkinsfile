@@ -213,7 +213,7 @@ stage('Post-Deployment Test') {
 
         stage('Cleanup on Failure') {
             when {
-                expression { currentBuild.result == 'FAILURE' || currentBuild.result == null }
+                expression { currentBuild.result == 'FAILURE'}
             }
             steps {
                 script {
