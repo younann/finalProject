@@ -5,12 +5,12 @@ metadata:
   namespace: kube-system
 data:
   mapRoles: |
-    - rolearn: arn:aws:iam::arn:aws:iam::211125613373:root
+    - rolearn: arn:aws:iam::arn:aws:iam::211125613373:user/Jenkins-user
       username: eks-admin-role
       groups:
         - system:masters
   mapUsers: |
-    - userarn: arn:aws:iam::211125613373:root
+    - userarn: arn:aws:iam::211125613373:user/Jenkins-user
       username: admin-user
       groups:
         - system:masters
