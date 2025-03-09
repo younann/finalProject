@@ -16,62 +16,50 @@ pipeline {
     }
 
     stages {
-        stage('Parallel Init and Build') {
-            parallel {
-                stage('Setup') {
-                    steps {
-                        parallel(
-                            "Checkout": {
-                                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
-                            },
-                            "AWS Auth": {
-                                sh '''
-                                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-                                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-                                    aws configure set region $AWS_DEFAULT_REGION
-                                    aws sts get-caller-identity
-                                    # Pre-authenticate with ECR to save time later
-                                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
-                                '''
-                            }
-                        )
-                    }
-                }
-                
-                stage('Infrastructure Check') {
-                    when {
-                        expression { return !params.SKIP_TERRAFORM }
-                    }
-                    steps {
-                        dir('infra') {
-                            script {
-                                // First check if infrastructure exists
-                                def infraExists = sh(
-                                    script: '''
-                                        terraform init -input=false
-                                        # Quick check for EKS cluster existence
-                                        if aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} >/dev/null 2>&1; then
-                                            echo "true"
-                                        else
-                                            echo "false"
-                                        fi
-                                    ''',
-                                    returnStdout: true
-                                ).trim()
+        stage('Setup') {
+            steps {
+                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
+                sh '''
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                    aws configure set region $AWS_DEFAULT_REGION
+                    aws sts get-caller-identity
+                    # Pre-authenticate with ECR
+                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                '''
+            }
+        }
 
-                                env.INFRA_EXISTS = infraExists
+        stage('Infrastructure Check') {
+            when {
+                expression { return !params.SKIP_TERRAFORM }
+            }
+            steps {
+                dir('infra') {
+                    script {
+                        def infraExists = sh(
+                            script: '''
+                                terraform init -input=false
+                                if aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} >/dev/null 2>&1; then
+                                    echo "true"
+                                else
+                                    echo "false"
+                                fi
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                                if (infraExists == 'true' && !params.FORCE_TERRAFORM) {
-                                    echo "Infrastructure exists, skipping Terraform"
-                                    env.TERRAFORM_CHANGES = 'false'
-                                } else {
-                                    def planResult = sh(
-                                        script: 'terraform plan -detailed-exitcode -out=tfplan -input=false',
-                                        returnStatus: true
-                                    )
-                                    env.TERRAFORM_CHANGES = planResult == 2 ? 'true' : 'false'
-                                }
-                            }
+                        env.INFRA_EXISTS = infraExists
+
+                        if (infraExists == 'true' && !params.FORCE_TERRAFORM) {
+                            echo "Infrastructure exists, skipping Terraform"
+                            env.TERRAFORM_CHANGES = 'false'
+                        } else {
+                            def planResult = sh(
+                                script: 'terraform plan -detailed-exitcode -out=tfplan -input=false',
+                                returnStatus: true
+                            )
+                            env.TERRAFORM_CHANGES = planResult == 2 ? 'true' : 'false'
                         }
                     }
                 }
@@ -121,16 +109,13 @@ pipeline {
                     steps {
                         script {
                             sh '''
-                                # Update kubeconfig if needed
                                 if ! kubectl config current-context &>/dev/null; then
                                     aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
                                 fi
                                 
-                                # Apply all configurations in parallel
-                                kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f - &
-                                kubectl apply -f k8s/aws-auth.yaml &
-                                kubectl apply -f k8s/test.yaml &
-                                wait
+                                # Apply configurations
+                                kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
+                                kubectl apply -f k8s/aws-auth.yaml -f k8s/test.yaml
                                 
                                 # Wait for deployment
                                 kubectl rollout status deployment/python-app -n devsecops --timeout=180s
@@ -143,20 +128,20 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                script {
-                    parallel(
-                        "Service Check": {
+                parallel(
+                    "Service Check": {
+                        script {
                             def serviceUrl = sh(
                                 script: "kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
                                 returnStdout: true
                             ).trim()
                             sh "curl -sf http://${serviceUrl}"
-                        },
-                        "Pod Check": {
-                            sh "kubectl wait --for=condition=ready pod -l app=python-app -n devsecops --timeout=180s"
                         }
-                    )
-                }
+                    },
+                    "Pod Check": {
+                        sh "kubectl wait --for=condition=ready pod -l app=python-app -n devsecops --timeout=180s"
+                    }
+                )
             }
         }
     }
