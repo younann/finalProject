@@ -5,7 +5,12 @@ metadata:
   namespace: kube-system
 data:
   mapRoles: |
-    - rolearn: arn:aws:iam::arn:aws:iam::211125613373:user/Jenkins-user
+    - rolearn: arn:aws:iam::211125613373:role/devsecops-eks-cluster-node-role
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+        - system:bootstrappers
+        - system:nodes
+    - rolearn: arn:aws:iam::211125613373:user/Jenkins-user
       username: eks-admin-role
       groups:
         - system:masters
@@ -14,3 +19,4 @@ data:
       username: admin-user
       groups:
         - system:masters
+
