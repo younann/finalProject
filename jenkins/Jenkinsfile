@@ -116,7 +116,7 @@ stage('Verify Kubernetes Connection') {
                     sh "kubectl get events -n devsecops"
                     sh "kubectl get configmap aws-auth -n kube-system -o yaml"
                     sh "kubectl describe deployment python-app -n devsecops"
-                    
+                    sh " kubectl logs python-app-7c46747b6d-6h4z8 -n devsecops"
                     sh "kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
                 }
             }
