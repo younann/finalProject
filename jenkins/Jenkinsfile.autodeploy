@@ -42,7 +42,14 @@ pipeline {
                 stage('Build Docker Image') {
                     steps {
                         script {
-                            sh "docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t ${ECR_REPO_NAME}:${IMAGE_TAG} ."
+                            sh '''
+                                # Attempt to use BuildKit if available, fallback to regular build if not
+                                if docker buildx version >/dev/null 2>&1; then
+                                    docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
+                                else
+                                    docker build --cache-from ${ECR_REPO_NAME}:${IMAGE_TAG} -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
+                                fi
+                            '''
                         }
                     }
                 }
