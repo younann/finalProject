@@ -1,0 +1,140 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
+        AWS_DEFAULT_REGION    = 'us-west-2'
+        ECR_REPO_NAME        = 'devsecops'
+        IMAGE_TAG            = 'latest'
+        ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        CLUSTER_NAME        = 'devsecops-eks-cluster'
+    }
+
+    stages {
+        stage('Quick Setup') {
+            steps {
+                git branch: 'impl-new', url: 'https://github.com/younann/finalProject.git'
+                sh '''
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                    aws configure set region $AWS_DEFAULT_REGION
+                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                '''
+            }
+        }
+
+        stage('Check Infrastructure') {
+            steps {
+                script {
+                    def infraStatus = sh(
+                        script: '''
+                            # Check if EKS cluster exists and is active
+                            CLUSTER_STATUS=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query 'cluster.status' --output text 2>/dev/null || echo "NOTFOUND")
+                            
+                            # Check if VPC exists
+                            VPC_ID=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query 'cluster.resourcesVpcConfig.vpcId' --output text 2>/dev/null || echo "")
+                            
+                            # Check if node group exists and is active
+                            NODE_STATUS=$(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} --query 'nodegroups[0]' --output text 2>/dev/null || echo "NOTFOUND")
+                            
+                            if [ "$CLUSTER_STATUS" = "ACTIVE" ] && [ ! -z "$VPC_ID" ] && [ "$NODE_STATUS" != "NOTFOUND" ]; then
+                                echo "INFRA_OK"
+                            else
+                                echo "INFRA_NEEDED"
+                            fi
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    env.INFRA_STATUS = infraStatus
+                    echo "Infrastructure status: ${infraStatus}"
+                }
+            }
+        }
+
+        stage('Apply Infrastructure') {
+            when {
+                expression { return env.INFRA_STATUS == 'INFRA_NEEDED' }
+            }
+            steps {
+                dir('infra') {
+                    sh '''
+                        terraform init
+                        terraform plan -out=tfplan
+                        terraform apply -auto-approve tfplan
+                    '''
+                }
+            }
+        }
+
+        stage('Build and Push') {
+            steps {
+                script {
+                    sh '''
+                        docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
+                        docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG}
+                        docker push ${ECR_URL}:${IMAGE_TAG}
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to K8s') {
+            steps {
+                script {
+                    sh '''
+                        # Ensure we have kubectl access
+                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${CLUSTER_NAME}
+                        
+                        # Quick namespace setup
+                        kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
+
+                        # Force new deployment
+                        TIMESTAMP=$(date +%s)
+                        kubectl set env deployment/python-app -n devsecops DEPLOYMENT_TIMESTAMP=$TIMESTAMP || true
+                        kubectl apply -f k8s/test.yaml
+
+                        # Wait for rollout
+                        kubectl rollout status deployment/python-app -n devsecops --timeout=90s
+                    '''
+                }
+            }
+        }
+
+        stage('Quick Health Check') {
+            steps {
+                script {
+                    sh '''
+                        # Get service URL
+                        SERVICE_URL=$(kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                        if [ ! -z "$SERVICE_URL" ]; then
+                            echo "Service URL: $SERVICE_URL"
+                            
+                            # Test endpoint
+                            if curl -sf http://${SERVICE_URL}; then
+                                echo "Application is responding!"
+                                exit 0
+                            fi
+                        fi
+                        
+                        echo "Service not responding"
+                        exit 1
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rmi ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG} || true"
+        }
+        failure {
+            echo 'Deployment failed!'
+        }
+        success {
+            echo 'Deployment successful!'
+        }
+    }
+}
