@@ -68,10 +68,11 @@ pipeline {
             steps {
                 dir('infra') {
                     script {
+                        // First check if infrastructure exists and is healthy
                         def infraExists = sh(
                             script: '''
-                                terraform init -input=false
-                                if aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} >/dev/null 2>&1; then
+                                # Check if EKS cluster exists and is ACTIVE
+                                if aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} 2>/dev/null | grep -q "ACTIVE"; then
                                     echo "true"
                                 else
                                     echo "false"
@@ -83,14 +84,23 @@ pipeline {
                         env.INFRA_EXISTS = infraExists
 
                         if (infraExists == 'true' && !params.FORCE_TERRAFORM) {
-                            echo "Infrastructure exists, skipping Terraform"
+                            echo "Infrastructure exists and is healthy. Skipping Terraform operations."
                             env.TERRAFORM_CHANGES = 'false'
                         } else {
+                            echo "Running Terraform plan to check for infrastructure changes..."
+                            sh 'terraform init -input=false'
                             def planResult = sh(
-                                script: 'terraform plan -detailed-exitcode -out=tfplan -input=false',
+                                script: 'terraform plan -detailed-exitcode -out=tfplan -input=false || true',
                                 returnStatus: true
                             )
+                            // planResult: 0 = no changes, 1 = error, 2 = changes needed
                             env.TERRAFORM_CHANGES = planResult == 2 ? 'true' : 'false'
+                            
+                            if (env.TERRAFORM_CHANGES == 'false') {
+                                echo "No infrastructure changes needed."
+                            } else {
+                                echo "Infrastructure changes detected."
+                            }
                         }
                     }
                 }
@@ -109,7 +119,10 @@ pipeline {
                     }
                     steps {
                         dir('infra') {
-                            sh 'terraform apply -auto-approve tfplan'
+                            script {
+                                echo "Applying infrastructure changes..."
+                                sh 'terraform apply -auto-approve tfplan'
+                            }
                         }
                     }
                 }
@@ -127,7 +140,7 @@ pipeline {
                                 kubectl apply -f k8s/aws-auth.yaml
                                 kubectl apply -f k8s/test.yaml
                                 
-                                # Wait for deployment with proper namespace
+                                # Wait for deployment with new image
                                 kubectl rollout status deployment/python-app -n devsecops --timeout=180s
                             '''
                         }
