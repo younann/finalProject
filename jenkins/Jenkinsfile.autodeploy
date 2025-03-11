@@ -113,21 +113,26 @@ pipeline {
                 script {
                     def buildTag = sh(script: 'cat build.tag', returnStdout: true).trim()
                     
-                    sh """
+                    sh '''
                         # Update kubeconfig
                         aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
                         
                         # Delete existing pods to force new image pull
                         echo "Removing existing pods..."
                         kubectl delete pods -n devsecops -l app=python-app --grace-period=0 --force || true
-                        
+                    '''
+                    
+                    // Use double quotes for variable interpolation
+                    sh """
                         # Update deployment with specific image tag
-                        kubectl set image deployment/python-app -n devsecops python-app=${ECR_URL}:${buildTag}
+                        kubectl set image deployment/python-app -n devsecops python-app=${ECR_URL}:${BUILD_TAG}
                         
-                        # Force rolling update
+                        # Force rolling update with escaped timestamp
                         kubectl patch deployment python-app -n devsecops -p \
-                            "{\\"spec\\":{\\"template\\":{\\"metadata\\":{\\"annotations\\":{\\"kubectl.kubernetes.io/restartedAt\\":\\"\\$(date +%s)\\"}}}}}}"
-                        
+                            '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'"\$(date +%s)"'"}}}}}}'
+                    """
+                    
+                    sh '''
                         # Wait for rollout
                         kubectl rollout status deployment/python-app -n devsecops --timeout=180s
                         
@@ -136,7 +141,7 @@ pipeline {
                         kubectl get pods -n devsecops -l app=python-app
                         echo "Deployed image:"
                         kubectl get deployment python-app -n devsecops -o jsonpath='{.spec.template.spec.containers[0].image}'
-                    """
+                    '''
                 }
             }
         }
