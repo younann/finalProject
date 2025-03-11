@@ -141,10 +141,6 @@ Connect to AWS ->Build docker image -> Run Unit Tests-> Push it to ECR -> Run Te
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Conclusion
 
 This project serves as a practical application of the concepts learned throughout the DevSecOps course, showcasing the importance of integrating security into the software development lifecycle.
