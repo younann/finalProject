@@ -138,10 +138,31 @@ pipeline {
                                 # Apply configurations
                                 kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
                                 kubectl apply -f k8s/aws-auth.yaml
+                                
+                                # Force pull the new image by patching deployment
+                                echo "Updating deployment to force pull new image..."
+                                TIMESTAMP=$(date +%s)
+                                kubectl set env deployment/python-app -n devsecops DEPLOYMENT_TIMESTAMP=$TIMESTAMP
                                 kubectl apply -f k8s/test.yaml
                                 
-                                # Wait for deployment with new image
-                                kubectl rollout status deployment/python-app -n devsecops --timeout=180s
+                                # Wait for rollout with increased timeout
+                                echo "Waiting for rollout to complete..."
+                                kubectl rollout status deployment/python-app -n devsecops --timeout=300s
+                                
+                                # Delete any pods that are not Ready
+                                echo "Cleaning up any stuck pods..."
+                                kubectl get pods -n devsecops -l app=python-app -o json | \
+                                jq -r '.items[] | select(.status.phase != "Running" or ([ .status.conditions[] | select(.type == "Ready" and .status == "True") ] | length == 0)) | .metadata.name' | \
+                                xargs -r kubectl delete pod -n devsecops
+                                
+                                # Wait for new pods
+                                echo "Waiting for new pods to be ready..."
+                                kubectl wait --for=condition=ready pod -l app=python-app -n devsecops --timeout=300s
+                                
+                                # Verify deployment
+                                echo "Verifying deployment status..."
+                                kubectl get pods -n devsecops -l app=python-app
+                                kubectl describe deployment python-app -n devsecops
                             '''
                         }
                     }
@@ -151,20 +172,51 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                parallel(
-                    "Service Check": {
-                        script {
-                            def serviceUrl = sh(
-                                script: "kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
-                                returnStdout: true
-                            ).trim()
-                            sh "curl -sf http://${serviceUrl}"
-                        }
-                    },
-                    "Pod Check": {
-                        sh "kubectl wait --for=condition=ready pod -l app=python-app -n devsecops --timeout=180s"
-                    }
-                )
+                script {
+                    sh '''
+                        # Wait for service to get endpoint
+                        echo "Waiting for service endpoint..."
+                        for i in $(seq 1 30); do
+                            SERVICE_URL=$(kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                            if [ ! -z "$SERVICE_URL" ]; then
+                                break
+                            fi
+                            echo "Waiting for service URL... Attempt $i/30"
+                            sleep 10
+                        done
+                        
+                        if [ -z "$SERVICE_URL" ]; then
+                            echo "Failed to get service URL"
+                            exit 1
+                        fi
+                        
+                        # Wait for endpoint to become responsive
+                        echo "Waiting for endpoint to become responsive..."
+                        for i in $(seq 1 30); do
+                            if curl -sf http://${SERVICE_URL}; then
+                                echo "Service is responding!"
+                                break
+                            fi
+                            echo "Waiting for service to respond... Attempt $i/30"
+                            sleep 10
+                        done
+                        
+                        # Final verification
+                        echo "Performing final health check..."
+                        curl -sf http://${SERVICE_URL}
+                    '''
+                    
+                    // Verify all pods are ready
+                    sh '''
+                        TOTAL_PODS=$(kubectl get deployment python-app -n devsecops -o jsonpath='{.spec.replicas}')
+                        READY_PODS=$(kubectl get deployment python-app -n devsecops -o jsonpath='{.status.readyReplicas}')
+                        
+                        if [ "$TOTAL_PODS" != "$READY_PODS" ]; then
+                            echo "Not all pods are ready: $READY_PODS/$TOTAL_PODS"
+                            exit 1
+                        fi
+                    '''
+                }
             }
         }
     }
