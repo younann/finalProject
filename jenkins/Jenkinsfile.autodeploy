@@ -16,25 +16,54 @@ pipeline {
     }
 
     stages {
-        stage('Quick Setup') {
+        stage('Verify Source') {
             steps {
-                git branch: 'main', url: 'https://github.com/younann/finalProject.git'
-                sh '''
-                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-                    aws configure set region $AWS_DEFAULT_REGION
-                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
-                '''
+                script {
+                    // Clean workspace first
+                    cleanWs()
+                    
+                    // Fresh checkout
+                    checkout scm
+                    
+                    // Print the content of the HTML file to verify we have the latest version
+                    sh '''
+                        echo "Current HTML content:"
+                        cat templates/index.html
+                        echo "Git commit info:"
+                        git log -1
+                    '''
+                }
             }
         }
 
         stage('Build and Push') {
             steps {
                 script {
+                    // Generate unique tag using timestamp and commit hash
+                    def timestamp = sh(script: 'date +%Y%m%d-%H%M%S', returnStdout: true).trim()
+                    def commitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.BUILD_TAG = "${timestamp}-${commitHash}"
+                    
                     sh '''
-                        docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
-                        docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG}
-                        docker push ${ECR_URL}:${IMAGE_TAG}
+                        # Clean any existing images
+                        docker rmi -f $(docker images -q ${ECR_URL}) || true
+                        
+                        # Build with both tags
+                        echo "Building fresh image with tag: ${BUILD_TAG}"
+                        docker build --no-cache -t ${ECR_REPO_NAME}:${BUILD_TAG} .
+                        
+                        # Login to ECR
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                        
+                        # Tag and push
+                        docker tag ${ECR_REPO_NAME}:${BUILD_TAG} ${ECR_URL}:${BUILD_TAG}
+                        docker tag ${ECR_REPO_NAME}:${BUILD_TAG} ${ECR_URL}:latest
+                        
+                        docker push ${ECR_URL}:${BUILD_TAG}
+                        docker push ${ECR_URL}:latest
+                        
+                        # Save the tag for later use
+                        echo ${BUILD_TAG} > build.tag
                     '''
                 }
             }
@@ -82,61 +111,56 @@ pipeline {
         stage('Deploy to K8s') {
             steps {
                 script {
-                    sh '''
-                        # Ensure we have kubectl access
+                    def buildTag = sh(script: 'cat build.tag', returnStdout: true).trim()
+                    
+                    sh """
+                        # Update kubeconfig
                         aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
-
-                        # Quick namespace setup
-                        kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
-
+                        
                         # Delete existing pods to force new image pull
                         echo "Removing existing pods..."
                         kubectl delete pods -n devsecops -l app=python-app --grace-period=0 --force || true
                         
-                        # Add unique label to force update
-                        TIMESTAMP=$(date +%s)
+                        # Update deployment with specific image tag
+                        kubectl set image deployment/python-app -n devsecops python-app=${ECR_URL}:${buildTag}
                         
-                        # Patch the deployment with a unique annotation
+                        # Force rolling update
                         kubectl patch deployment python-app -n devsecops -p \
-                            "{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"labels\\\":{\\\"deployment-time\\\":\\\"${TIMESTAMP}\\\"}}}}}"
+                            "{\\"spec\\":{\\"template\\":{\\"metadata\\":{\\"annotations\\":{\\"kubectl.kubernetes.io/restartedAt\\":\\"\\$(date +%s)\\"}}}}}}"
                         
-                        # Apply the deployment
-                        kubectl apply -f k8s/test.yaml
-                        
-                        # Wait for new pods
-                        echo "Waiting for new pods to be ready..."
+                        # Wait for rollout
                         kubectl rollout status deployment/python-app -n devsecops --timeout=180s
                         
                         # Verify the deployment
-                        echo "Checking pod status and images..."
+                        echo "Verifying deployment..."
                         kubectl get pods -n devsecops -l app=python-app
-                        kubectl describe deployment python-app -n devsecops | grep Image:
-                    '''
+                        echo "Deployed image:"
+                        kubectl get deployment python-app -n devsecops -o jsonpath='{.spec.template.spec.containers[0].image}'
+                    """
                 }
             }
         }
 
-        stage('Quick Health Check') {
+        stage('Verify Deployment') {
             steps {
                 script {
                     sh '''
                         # Get service URL
-                        for i in {1..6}; do
-                            SERVICE_URL=$(kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-                            if [ ! -z "$SERVICE_URL" ]; then
-                                echo "Service URL: $SERVICE_URL"
-                                
-                                # Test endpoint
-                                if curl -sf http://${SERVICE_URL}; then
-                                    echo "Application is responding!"
-                                    exit 0
-                                fi
+                        SERVICE_URL=$(kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                        
+                        echo "Service URL: $SERVICE_URL"
+                        
+                        # Wait for service to be ready
+                        for i in {1..12}; do
+                            if curl -s "$SERVICE_URL" | grep -q "$(date +%Y)"; then
+                                echo "New version verified!"
+                                exit 0
                             fi
-                            echo "Waiting for service... Attempt $i/6"
+                            echo "Waiting for new version to be available... Attempt $i/12"
                             sleep 10
                         done
                         
-                        echo "Service not responding in time"
+                        echo "Failed to verify new version"
                         exit 1
                     '''
                 }
@@ -146,7 +170,12 @@ pipeline {
 
     post {
         always {
-            sh "docker rmi ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URL}:${IMAGE_TAG} || true"
+            script {
+                sh '''
+                    # Cleanup docker images
+                    docker rmi -f $(docker images -q ${ECR_URL}) || true
+                '''
+            }
         }
         failure {
             echo 'Deployment failed!'
