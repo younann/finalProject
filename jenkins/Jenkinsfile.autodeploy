@@ -8,6 +8,7 @@ pipeline {
         ECR_REPO_NAME        = 'devsecops'
         IMAGE_TAG            = 'latest'
         ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        CLUSTER_NAME        = 'devsecops-eks-cluster'
     }
 
     stages {
@@ -20,6 +21,50 @@ pipeline {
                     aws configure set region $AWS_DEFAULT_REGION
                     aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
                 '''
+            }
+        }
+
+        stage('Check Infrastructure') {
+            steps {
+                script {
+                    def infraStatus = sh(
+                        script: '''
+                            # Check if EKS cluster exists and is active
+                            CLUSTER_STATUS=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query 'cluster.status' --output text 2>/dev/null || echo "NOTFOUND")
+                            
+                            # Check if VPC exists
+                            VPC_ID=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query 'cluster.resourcesVpcConfig.vpcId' --output text 2>/dev/null || echo "")
+                            
+                            # Check if node group exists and is active
+                            NODE_STATUS=$(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} --query 'nodegroups[0]' --output text 2>/dev/null || echo "NOTFOUND")
+                            
+                            if [ "$CLUSTER_STATUS" = "ACTIVE" ] && [ ! -z "$VPC_ID" ] && [ "$NODE_STATUS" != "NOTFOUND" ]; then
+                                echo "INFRA_OK"
+                            else
+                                echo "INFRA_NEEDED"
+                            fi
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    env.INFRA_STATUS = infraStatus
+                    echo "Infrastructure status: ${infraStatus}"
+                }
+            }
+        }
+
+        stage('Apply Infrastructure') {
+            when {
+                expression { return env.INFRA_STATUS == 'INFRA_NEEDED' }
+            }
+            steps {
+                dir('infra') {
+                    sh '''
+                        terraform init
+                        terraform plan -out=tfplan
+                        terraform apply -auto-approve tfplan
+                    '''
+                }
             }
         }
 
@@ -40,7 +85,7 @@ pipeline {
                 script {
                     sh '''
                         # Ensure we have kubectl access
-                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
+                        aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name ${CLUSTER_NAME}
                         
                         # Quick namespace setup
                         kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
