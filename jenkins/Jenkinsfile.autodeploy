@@ -89,13 +89,28 @@ pipeline {
                         # Quick namespace setup
                         kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
 
-                        # Force new deployment
+                        # Delete existing pods to force new image pull
+                        echo "Removing existing pods..."
+                        kubectl delete pods -n devsecops -l app=python-app --grace-period=0 --force || true
+                        
+                        # Add unique label to force update
                         TIMESTAMP=$(date +%s)
-                        kubectl set env deployment/python-app -n devsecops DEPLOYMENT_TIMESTAMP=$TIMESTAMP || true
+                        
+                        # Patch the deployment with a unique annotation
+                        kubectl patch deployment python-app -n devsecops -p \
+                            "{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"labels\\\":{\\\"deployment-time\\\":\\\"${TIMESTAMP}\\\"}}}}}"
+                        
+                        # Apply the deployment
                         kubectl apply -f k8s/test.yaml
-
-                        # Wait for rollout
-                        kubectl rollout status deployment/python-app -n devsecops --timeout=90s
+                        
+                        # Wait for new pods
+                        echo "Waiting for new pods to be ready..."
+                        kubectl rollout status deployment/python-app -n devsecops --timeout=180s
+                        
+                        # Verify the deployment
+                        echo "Checking pod status and images..."
+                        kubectl get pods -n devsecops -l app=python-app
+                        kubectl describe deployment python-app -n devsecops | grep Image:
                     '''
                 }
             }
