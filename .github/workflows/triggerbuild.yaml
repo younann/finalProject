@@ -5,10 +5,17 @@ on:
     branches: ["main"]
 
 jobs:
-  build:
+  trigger-jenkins:
     runs-on: ubuntu-latest
     steps:
+      - name: Retrieve CSRF Crumb
+        id: crumb
+        run: |
+          CRUMB=$(curl -s "http://jenkins_project:${{ secrets.JENKINS_API_TOKEN }}@ec2-52-201-101-219.compute-1.amazonaws.com:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,':',//crumb)")
+          echo "crumb=$CRUMB" >> $GITHUB_OUTPUT
       - name: Trigger Jenkins Job
         run: |
+          echo "Triggering Jenkins build..."
           curl -X POST "http://ec2-52-201-101-219.compute-1.amazonaws.com:8080/job/autodeploy1/buildWithParameters?token=devsecops_build" \
-          --user "my-jenkins-user:${{ secrets.JENKINS_API_TOKEN }}"
+            --user "jenkins_project:${{ secrets.JENKINS_API_TOKEN }}" \
+            -H "${{ steps.crumb.outputs.crumb }}"
