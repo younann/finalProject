@@ -10,7 +10,7 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2'
-        ECR_REPO_NAME        = 'python-app-repo'
+        ECR_REPO_NAME        = 'devsecops'
         IMAGE_TAG            = 'latest'
         ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
     }
@@ -115,9 +115,10 @@ pipeline {
                                 
                                 # Apply configurations
                                 kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -
-                                kubectl apply -f k8s/aws-auth.yaml -f k8s/test.yaml
+                                kubectl apply -f k8s/aws-auth.yaml
+                                kubectl apply -f k8s/test.yaml
                                 
-                                # Wait for deployment
+                                # Wait for deployment with proper namespace
                                 kubectl rollout status deployment/python-app -n devsecops --timeout=180s
                             '''
                         }
