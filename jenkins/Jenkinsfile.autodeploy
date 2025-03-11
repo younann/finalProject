@@ -1,36 +1,39 @@
 pipeline {
     agent any
 
-    parameters {
-        booleanParam(name: 'SKIP_TERRAFORM', defaultValue: true, description: 'Skip Terraform deployment?')
-        booleanParam(name: 'FORCE_TERRAFORM', defaultValue: false, description: 'Force Terraform apply even if no changes?')
-    }
-
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
         AWS_DEFAULT_REGION    = 'us-west-2'
         ECR_REPO_NAME        = 'devsecops'
-        IMAGE_TAG            = 'latest'
         ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        GIT_BRANCH          = 'impl-new'  
     }
 
     stages {
-        stage('Verify Source') {
+        stage('Checkout') {
             steps {
                 script {
-                    // Clean workspace first
+                    // Clean workspace
                     cleanWs()
                     
-                    // Fresh checkout
-                    checkout scm
+                    // Checkout specific branch
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${GIT_BRANCH}"]],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/younann/finalProject.git'
+                        ]]
+                    ])
                     
-                    // Print the content of the HTML file to verify we have the latest version
+                    // Verify we're on the right branch and have the latest code
                     sh '''
-                        echo "Current HTML content:"
-                        cat templates/index.html
-                        echo "Git commit info:"
+                        echo "Current branch:"
+                        git branch --show-current
+                        echo "Latest commit:"
                         git log -1
+                        echo "HTML content:"
+                        cat templates/index.html
                     '''
                 }
             }
@@ -39,7 +42,6 @@ pipeline {
         stage('Build and Push') {
             steps {
                 script {
-                    // Generate unique tag using timestamp and commit hash
                     def timestamp = sh(script: 'date +%Y%m%d-%H%M%S', returnStdout: true).trim()
                     def commitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     env.BUILD_TAG = "${timestamp}-${commitHash}"
@@ -48,11 +50,11 @@ pipeline {
                         # Clean any existing images
                         docker rmi -f $(docker images -q ${ECR_URL}) || true
                         
-                        # Build with both tags
-                        echo "Building fresh image with tag: ${BUILD_TAG}"
+                        # Build fresh image
+                        echo "Building image with tag: ${BUILD_TAG}"
                         docker build --no-cache -t ${ECR_REPO_NAME}:${BUILD_TAG} .
                         
-                        # Login to ECR
+                        # ECR login
                         aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
                         
                         # Tag and push
@@ -62,47 +64,7 @@ pipeline {
                         docker push ${ECR_URL}:${BUILD_TAG}
                         docker push ${ECR_URL}:latest
                         
-                        # Save the tag for later use
                         echo ${BUILD_TAG} > build.tag
-                    '''
-                }
-            }
-        }
-
-        stage('Check Infrastructure') {
-            when {
-                expression { return !params.SKIP_TERRAFORM }
-            }
-            steps {
-                script {
-                    def clusterExists = sh(
-                        script: 'aws eks describe-cluster --name devsecops-eks-cluster --region ${AWS_DEFAULT_REGION} 2>/dev/null || echo "false"',
-                        returnStdout: true
-                    ).trim()
-                    
-                    env.NEEDS_TERRAFORM = clusterExists == 'false' ? 'true' : 'false'
-                    
-                    if (env.NEEDS_TERRAFORM == 'false' && !params.FORCE_TERRAFORM) {
-                        echo "Cluster exists and running. Skipping Terraform."
-                    } else {
-                        echo "Infrastructure needs to be created or updated."
-                    }
-                }
-            }
-        }
-
-        stage('Apply Infrastructure') {
-            when {
-                expression { 
-                    return !params.SKIP_TERRAFORM && 
-                           (env.NEEDS_TERRAFORM == 'true' || params.FORCE_TERRAFORM)
-                }
-            }
-            steps {
-                dir('infra') {
-                    sh '''
-                        terraform init -input=false
-                        terraform apply -auto-approve
                     '''
                 }
             }
@@ -114,20 +76,19 @@ pipeline {
                     def buildTag = sh(script: 'cat build.tag', returnStdout: true).trim()
                     
                     sh '''
-                        # Update kubeconfig
+                        # Configure kubectl
                         aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name devsecops-eks-cluster
                         
-                        # Delete existing pods to force new image pull
+                        # Remove old pods
                         echo "Removing existing pods..."
                         kubectl delete pods -n devsecops -l app=python-app --grace-period=0 --force || true
                     '''
                     
-                    // Use double quotes for variable interpolation
                     sh """
-                        # Update deployment with specific image tag
+                        # Update deployment
                         kubectl set image deployment/python-app -n devsecops python-app=${ECR_URL}:${BUILD_TAG}
                         
-                        # Force rolling update with escaped timestamp
+                        # Force update
                         kubectl patch deployment python-app -n devsecops -p \
                             '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'"\$(date +%s)"'"}}}}}}'
                     """
@@ -136,37 +97,18 @@ pipeline {
                         # Wait for rollout
                         kubectl rollout status deployment/python-app -n devsecops --timeout=180s
                         
-                        # Verify the deployment
-                        echo "Verifying deployment..."
+                        # Verify deployment
+                        echo "Pod status:"
                         kubectl get pods -n devsecops -l app=python-app
                         echo "Deployed image:"
                         kubectl get deployment python-app -n devsecops -o jsonpath='{.spec.template.spec.containers[0].image}'
-                    '''
-                }
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                script {
-                    sh '''
+                        
                         # Get service URL
                         SERVICE_URL=$(kubectl get svc python-app-service -n devsecops -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-                        
                         echo "Service URL: $SERVICE_URL"
                         
-                        # Wait for service to be ready
-                        for i in {1..12}; do
-                            if curl -s "$SERVICE_URL" | grep -q "$(date +%Y)"; then
-                                echo "New version verified!"
-                                exit 0
-                            fi
-                            echo "Waiting for new version to be available... Attempt $i/12"
-                            sleep 10
-                        done
-                        
-                        echo "Failed to verify new version"
-                        exit 1
+                        # Test the endpoint
+                        curl -s "$SERVICE_URL"
                     '''
                 }
             }
@@ -175,18 +117,16 @@ pipeline {
 
     post {
         always {
-            script {
-                sh '''
-                    # Cleanup docker images
-                    docker rmi -f $(docker images -q ${ECR_URL}) || true
-                '''
-            }
-        }
-        failure {
-            echo 'Deployment failed!'
+            cleanWs()
+            sh '''
+                docker rmi -f $(docker images -q ${ECR_URL}) || true
+            '''
         }
         success {
-            echo 'Deployment successful!'
+            echo "Deployment successful! Check the service URL above."
+        }
+        failure {
+            echo "Deployment failed. Check the logs for details."
         }
     }
 }
