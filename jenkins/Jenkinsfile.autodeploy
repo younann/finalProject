@@ -68,6 +68,26 @@ pipeline {
             }
         }
 
+        stage('Run Unit Tests') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            # Install test dependencies if needed
+                            pip install -r requirements.txt
+                            pip install pytest pytest-cov
+                            
+                            # Run the tests
+                            python -m pytest tests/ --cov=app
+                        '''
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error "Unit tests failed. Stopping deployment."
+                    }
+                }
+            }
+        }
+
         stage('Build and Push') {
             steps {
                 script {
