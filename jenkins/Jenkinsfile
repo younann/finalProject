@@ -52,7 +52,7 @@ stage('Build Docker Image') {
                 script {
                     // Authenticate Docker to ECR
                     sh '''
-                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                        aws ecr get-login-password --region us-west-2 | \
                         docker login --username AWS --password-stdin ${ECR_URL}
                     '''
 
