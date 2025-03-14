@@ -12,7 +12,7 @@ pipeline {
         AWS_DEFAULT_REGION    = 'us-east-1'
         ECR_REPO_NAME         = 'python-app-repo'
         IMAGE_TAG             = 'latest'
-        ECR_URL               = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        ECR_URL               = '522814691815.dkr.ecr.us-east-1.amazonaws.com/devsecops'
     }
 
     stages {
