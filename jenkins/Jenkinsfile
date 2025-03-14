@@ -110,7 +110,7 @@ stage('Verify Kubernetes Connection') {
                     sh "kubectl get pods -n devsecops"
                     sh "kubectl apply -f k8s/aws-auth.yaml"
                     sh  "kubectl create namespace devsecops --dry-run=client -o yaml | kubectl apply -f -"
-                    sh "kubectl apply -f k8s/test.yaml"
+                    sh "kubectl apply -f k8s/deployment.yaml"
                     sh "kubectl get pods -n devsecops"
                     
                     sh "kubectl get events -n devsecops"
