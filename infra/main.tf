@@ -269,3 +269,11 @@ resource "aws_iam_role_policy_attachment" "eks_networking_policy_cluster" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSNetworkingPolicy"
   role       = aws_iam_role.eks_cluster_role.name
 }
+resource "aws_iam_role_policy_attachment" "eks_cluster_elb_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+resource "aws_iam_role_policy_attachment" "eks_node_group_ec2_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+  role       = aws_iam_role.eks_node_group_role.name
+}
