@@ -6,17 +6,12 @@ metadata:
 data:
   mapRoles: |
     - rolearn: arn:aws:iam::522814691815:role/devsecops-eks-cluster-node-role
-      username: system:node:ip-10-0-1-198.us-east-1.compute.internal
+      username: system:node:{{EC2PrivateDNSName}}
       groups:
         - system:bootstrappers
         - system:nodes
-    - rolearn: arn:aws:iam::522814691815:user/Jenkins-user
-      username: eks-admin-role
-      groups:
-        - system:masters
   mapUsers: |
     - userarn: arn:aws:iam::522814691815:user/Jenkins-user
       username: admin-user
       groups:
         - system:masters
-
