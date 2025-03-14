@@ -100,6 +100,11 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
+# Attach the AmazonEC2FullAccess policy to the EKS cluster role
+resource "aws_iam_role_policy_attachment" "eks_cluster_ec2_full_access" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+  role       = aws_iam_role.eks_cluster_role.name
+}
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -222,6 +227,7 @@ resource "aws_route_table_association" "public_assoc" {
   subnet_id      = aws_subnet.eks_subnets[count.index].id
   route_table_id = aws_route_table.public.id
 }
+
 # Attach additional EKS policies to the Node Group Role
 resource "aws_iam_role_policy_attachment" "eks_block_storage_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSBlockStoragePolicy"
@@ -263,5 +269,3 @@ resource "aws_iam_role_policy_attachment" "eks_networking_policy_cluster" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSNetworkingPolicy"
   role       = aws_iam_role.eks_cluster_role.name
 }
-
-
