@@ -211,19 +211,6 @@ stage('Post-Deployment Test') {
             }
         }
 
-        stage('Cleanup on Failure') {
-            when {
-        expression { currentBuild.result == 'FAILURE' || !params.SKIP_TERRAFORM }
-    }
-            steps {
-                script {
-                    echo "Pipeline failed. Cleaning up resources..."
-                    dir('infra') {
-                        sh 'terraform destroy -auto-approve'
-                    }
-                }
-            }
-        }
     }
 
  post {
