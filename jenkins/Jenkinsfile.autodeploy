@@ -4,10 +4,10 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-access-key')
-        AWS_DEFAULT_REGION    = 'us-west-2'
-        ECR_REPO_NAME        = 'devsecops'
+        AWS_DEFAULT_REGION    = 'us-east-1'
+        ECR_REPO_NAME        = 'python-app-repo'
         IMAGE_TAG            = 'latest'
-        ECR_URL             = '211125613373.dkr.ecr.us-west-2.amazonaws.com/devsecops'
+        ECR_URL             = '522814691815.dkr.ecr.us-east-1.amazonaws.com/devsecops'
         CLUSTER_NAME        = 'devsecops-eks-cluster'
     }
 
