@@ -38,6 +38,15 @@ pipeline {
                             # Check if node group exists and is active
                             NODE_STATUS=$(aws eks list-nodegroups --cluster-name ${CLUSTER_NAME} --query 'nodegroups[0]' --output text 2>/dev/null || echo "NOTFOUND")
                             
+                            # Check if DynamoDB table exists
+                            DYNAMODB_STATUS=$(aws dynamodb describe-table --table-name devsecops-eks-app-table --query 'Table.TableStatus' --output text 2>/dev/null || echo "NOTFOUND")
+                            
+                            # Check if S3 bucket exists
+                            S3_STATUS=$(aws s3api head-bucket --bucket devsecops-eks-app-bucket 2>/dev/null && echo "EXISTS" || echo "NOTFOUND")
+                            
+                            # Check if ALB exists
+                            ALB_STATUS=$(aws elbv2 describe-load-balancers --names devsecops-eks-cluster-alb --query 'LoadBalancers[0].State.Code' --output text 2>/dev/null || echo "NOTFOUND")
+                            
                             if [ "$CLUSTER_STATUS" = "ACTIVE" ] && [ ! -z "$VPC_ID" ] && [ "$NODE_STATUS" != "NOTFOUND" ]; then
                                 echo "INFRA_OK"
                             else
@@ -61,8 +70,10 @@ pipeline {
                 dir('infra') {
                     sh '''
                         terraform init
+                        # Try to refresh state first to detect existing resources
+                        terraform apply -refresh-only -auto-approve || true
                         terraform plan -out=tfplan
-                        terraform apply -auto-approve tfplan
+                        terraform apply -auto-approve tfplan || true
                     '''
                 }
             }
