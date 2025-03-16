@@ -146,3 +146,5 @@ Connect to AWS ->Build docker image -> Run Unit Tests-> Push it to ECR -> Run Te
 This project serves as a practical application of the concepts learned throughout the DevSecOps course, showcasing the importance of integrating security into the software development lifecycle.
 
 We hope you find this project insightful and beneficial for your future endeavors in the field of DevSecOps!
+
+
